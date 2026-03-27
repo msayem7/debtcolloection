@@ -75,7 +75,7 @@ import { useBranchStore } from '@/stores/branchStore'
   
   
 const store = useBranchStore()
-const dateFormatter = { formatDate };
+//const dateFormatter = { formatDate };
 const cheques = ref([])
 const customers = ref([])
 const filters = ref({

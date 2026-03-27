@@ -275,6 +275,7 @@ const branchStore = useBranchStore()
 const isDragging = ref(false)
 const leftPanelWidth = ref(40) // Initial width percentage for left panel
 
+// eslint-disable-next-line
 const startDrag = (e) => {
   isDragging.value = true
   document.addEventListener('mousemove', handleDrag)
@@ -619,7 +620,7 @@ const addPaymentDetail = () => {
 const removePaymentDetail = (index) => {
   formData.value.payment_details.splice(index, 1)
 }
-
+// eslint-disable-next-line
 const updateInstrumentDetails = (index) => {
   // You can add logic here to update details based on instrument selection if needed
 }

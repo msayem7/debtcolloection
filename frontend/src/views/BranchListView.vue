@@ -61,6 +61,7 @@
       const { data } = await axios.get('/v1/chq/branches/') 
       
       branches.value = data
+      // eslint-disable-next-line
       branches.value.forEach(branch => {
       });
     } catch (error) {

@@ -167,13 +167,13 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from '@/plugins/axios'
 import { useBranchStore } from '@/stores/branchStore'
 import CustomerDropdown from '@/components/CustomerDropdown.vue'
 // import CustomerClaims from '@/views/CustomerClaims.vue'
-import { Number } from 'core-js'
+//import { Number } from 'core-js'
 
 import { formatNumber, parseNumber } from '@/utils/ezFormatter'
 
@@ -390,7 +390,7 @@ const handleSubmit = async () => {
     // })
     
     // formData.append('branch', branch)
-
+    // eslint-disable-next-line 
     const response = await axios({
       method: editing.value ? 'put' : 'post',
       url: editing.value ? `/v1/chq/credit-invoices/${invoiceId.value}/` : '/v1/chq/credit-invoices/',

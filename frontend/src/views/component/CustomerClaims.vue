@@ -88,7 +88,11 @@ const totalAmount = computed(() => {
 })
 
 // Add this function
-function handleClaimInput(index) {
+// eslint-disable-next-line
+function handleClaimInput(
+  // eslint-disable-next-line
+  index
+) {
   //validateClaimNo(index); // No need as this local claim  are now handling from server side
   updateClaims(); // Propagate changes immediately
 }

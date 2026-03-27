@@ -74,10 +74,10 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch, watchEffect } from 'vue'
+import { ref, onMounted, watch, watchEffect } from 'vue'
 import { useNotificationStore } from '@/stores/notificationStore'
 import { useBranchStore } from '@/stores/branchStore'
-import { formatDate, ServerDateFormat, formatNumber, parseNumber } from '@/utils/ezFormatter'
+import { formatDate,  parseNumber } from '@/utils/ezFormatter'
 import ExistingPayments from '@/views/component/ExistingPayments.vue'
 import ReceivedCheques from '@/views/component/ReceivedCustomerPayments.vue'
 import CustomerClaims from '@/views/component/CustomerClaims.vue'
@@ -111,8 +111,10 @@ const invoiceError = ref(null)
 
 const errors = ref({})
 
+
 watch(
   () => branchStore.selectedBranch,
+  // eslint-disable-next-line
   async (newBranch) => {
     // console.log('Branch changed:', newBranch)
     try {
@@ -207,6 +209,7 @@ async function submitPayment() {
       .map(c => c.receipt_no)
       .filter(n => n.trim() !== '')
 
+// eslint-disable-next-line
     const claimNos = formData.value.claims
       .map(c => c.claim_no)
       .filter(n => n.trim() !== '')  // Add this filter
@@ -219,6 +222,7 @@ async function submitPayment() {
     //   throw new Error('Duplicate claim numbers exist')
     // }
     // Store customer ID before reset
+    // eslint-disable-next-line
     const customerAliasId = formData.value.customer?.alias_id
     const filteredClaims = formData.value.claims.filter(claim => {
       const amount = parseFloat(claim.claim_amount);
@@ -231,7 +235,9 @@ async function submitPayment() {
     });
     
     // console.log ('formData.value.allocations', formData.value.allocations)
+    // eslint-disable-next-line
     const validAllocations = Object.entries(formData.value.allocations)
+    // eslint-disable-next-line
       .filter(([invoiceId, allocation]) => {
         const chequeAllocations = Object.values(allocation.cheques || {}).reduce((sum, val) => sum + parseNumber(val || 0), 0)
         const claimAllocations = Object.values(allocation.claims || {}).reduce((sum, val) => sum + parseNumber(val || 0), 0)
@@ -268,6 +274,7 @@ async function submitPayment() {
     //console.log('Allocations:', JSON.parse(JSON.stringify(formData.value.allocations)))
     // console.log('Existing Payments:', filteredExisting.value)
 
+    // eslint-disable-next-line
     const response = await axios.post('/v1/chq/customer-payments/', payload);
   
     notificationStore.showSuccess('Payment recorded successfully');

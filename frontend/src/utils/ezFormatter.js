@@ -19,6 +19,7 @@ export function formatDate(dateString) {
     return "Invalid Date";
   }
 
+  // eslint-disable-next-line
   const options = {
     timeZone: 'Asia/Dhaka',
     year: 'numeric',
@@ -37,7 +38,7 @@ export function ServerDateFormat(dateString){
   return this.formatDateToISO(new Date(dateString));
 
 }
-  
+// eslint-disable-next-line
 function ISODatePart(isoString) {
   if (typeof isoString !== 'string') {
     return "Invalid Input";

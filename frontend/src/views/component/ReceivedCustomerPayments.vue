@@ -89,7 +89,7 @@
 
 <script setup>
 import { ref, watchEffect } from 'vue'
-import { formatDate, parseDate, formatNumber, parseNumber } from '@/utils/ezFormatter'
+import {parseDate, formatNumber, parseNumber } from '@/utils/ezFormatter'
 
 // Add error state
 const chequeErrors = ref([])

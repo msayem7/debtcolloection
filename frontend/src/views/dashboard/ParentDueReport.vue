@@ -146,9 +146,9 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import axios from '@/plugins/axios'
-import { formatDate, formatNumber } from '@/utils/ezFormatter'
+import { formatNumber } from '@/utils/ezFormatter'
 import { useNotificationStore } from '@/stores/notificationStore'
 import { useBranchStore } from '@/stores/branchStore'
 
@@ -173,6 +173,7 @@ const sortColumn = ref('name') // Default sort column
 const sortDirection = ref('asc') // Default sort direction
 
 // Computed property to get current branch name
+// eslint-disable-next-line
 const currentBranchName = computed(() => {
   if (!branchStore.selectedBranch) return 'All Branches'
   const branch = branchStore.branches.find(b => b.alias_id === branchStore.selectedBranch)

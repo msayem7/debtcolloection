@@ -212,7 +212,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useBranchStore } from '@/stores/branchStore'
 import axios from '@/plugins/axios'
 import { useRouter } from 'vue-router'
@@ -326,6 +326,7 @@ const getCustomerName = (customerId) => {
   return customer ? customer.name : 'Unknown'
 }
 
+// eslint-disable-next-line
 const calculateTotalAmount = (payment) => {
   return payment.payment_details.reduce((sum, detail) => {
     return sum + parseFloat(detail.amount)
@@ -336,6 +337,7 @@ const netSales = (invoice)=>{
     return (invoice.sales_amount - invoice.sales_return)
   }
 
+// eslint-disable-next-line
 const cashAndBankAmount = (payment) => {
   return payment.payment_details.reduce((sum, detail) => {    
     // Check if the amount is a valid number before adding it
@@ -351,6 +353,7 @@ const cashAndBankAmount = (payment) => {
   }, 0);
 }
 
+// eslint-disable-next-line
 const claimAmount = (payment) => {
   return payment.payment_details.reduce((sum, detail) => {    
     const amount = parseFloat(detail.amount);

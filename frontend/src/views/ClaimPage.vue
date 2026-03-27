@@ -98,6 +98,7 @@ const errorMessage = ref('');
 watch(() => branchStore.selectedBranch, async (newBranch) => {
   if (newBranch) {
     try {
+      // eslint-disable-next-line
       const [claimsRes, categoriesRes] = await Promise.all([
         axios.get(`/v1/chq/master-claims/?branch=${newBranch}`)
       ]);

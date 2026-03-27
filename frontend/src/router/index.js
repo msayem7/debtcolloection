@@ -9,7 +9,7 @@ import PendingListView from '../views/PendingListView';
 // import ChequeDepositedView from '../views/ChequeDepositedView';
 // import InvoiceChequeRep from '@/reports/InvoiceChequeRep.vue';
 import SalesDetailReport from '../views/SalesDetailReport';
-import ChargesListView from '@/views/ChargesListView.vue';
+//import ChargesListView from '@/views/ChargesListView.vue';
 import DiductionsView from '@/views/archive_vue/DiductionsView.vue';
 import PaymentListView from '@/views/PaymentListView.vue';
 import PaymentForm from '@/views/PaymentForm.vue';

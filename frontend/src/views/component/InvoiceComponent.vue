@@ -422,7 +422,9 @@ const validateAllocation = (invoice) => {
 
    
   // Validate cheque allocations
-  activeCheques.value.forEach(chq => {
+  activeCheques.value.forEach(
+    // eslint-disable-next-line
+    chq => {
      // 2. Cheque total validation
     activeCheques.value.forEach(cheque => {
       const totalAllocated = chequeTotals.value[cheque.receipt_no] || 0
@@ -507,7 +509,9 @@ const hasAllocationError = (invoice, type, identifier) => {
 
 watch(() => props.cheques, initializeAllocations, { deep: true })
 //watch(() => props.claims, initializeAllocations, { deep: true })
-watch(() => props.claims, (newClaims) => {
+watch(() => props.claims, (
+// eslint-disable-next-line
+  newClaims) => {
   initializeAllocations()
   validateAllAllocations()
 }, { deep: true })
