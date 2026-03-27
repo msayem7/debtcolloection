@@ -1,0 +1,6 @@
+05. Create virtual environment and install dependencies, node etc 
+10. Modify env, .gitingore, docker-compose.yml, 
+20. create nginx 
+30. run the project
+40. Bind to git
+50. Deploy
