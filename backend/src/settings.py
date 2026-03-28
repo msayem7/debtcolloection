@@ -51,7 +51,7 @@ DEBUG = config('DEBUG', default=True, cast=bool)
 #     # ... any other hosts you need
 # ]
 #31.97.226.125,srv1012667.hstgr.cloud,
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1, srv1061419.hstgr.cloud,72.60.206.97').split(',')
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1,0.0.0.0').split(',')
 # Application definition
 
 INSTALLED_APPS = [
@@ -71,8 +71,8 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware',
+    'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -84,22 +84,29 @@ MIDDLEWARE = [
 
 
 CORS_ALLOW_ALL_ORIGINS = False
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:8080",
-    "https://ezcheque.netlify.app",
-    "https://ezdist.netlify.app",
-    "https://srv1012667.hstgr.cloud",
-    "https://31.97.226.125",    
-    "https://srv1061419.hstgr.cloud",
-    "https://72.60.206.97"
-]
 
-CSRF_TRUSTED_ORIGINS = [
-    "https://srv1012667.hstgr.cloud",
-    "https://31.97.226.125",    
-    "https://srv1061419.hstgr.cloud",
-    "https://72.60.206.97"
-]
+# CORS Configuration (for frontend)
+cors_origins = os.environ.get('CORS_ALLOWED_ORIGINS', 'http://localhost:5173,http://localhost:3000,http://localhost:8080,http://127.0.0.1:5173')
+CORS_ALLOWED_ORIGINS = [origin.strip() for origin in cors_origins.split(',') if origin.strip()]
+CORS_ALLOW_CREDENTIALS = True
+CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in cors_origins.split(',') if origin.strip()]
+
+# CORS_ALLOWED_ORIGINS = [
+#     "http://localhost:8080",
+#     "https://ezcheque.netlify.app",
+#     "https://ezdist.netlify.app",
+#     "https://srv1012667.hstgr.cloud",
+#     "https://31.97.226.125",    
+#     "https://srv1061419.hstgr.cloud",
+#     "https://72.60.206.97"
+# ]
+
+# CSRF_TRUSTED_ORIGINS = [
+#     "https://srv1012667.hstgr.cloud",
+#     "https://31.97.226.125",    
+#     "https://srv1061419.hstgr.cloud",
+#     "https://72.60.206.97"
+# ]
 
 CORS_ALLOW_METHODS = [
     "GET",
@@ -216,17 +223,42 @@ WSGI_APPLICATION = 'src.wsgi.application'
 #     }
 # }
 
-# production Database settings for PostgreSQL in docker container
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.environ.get('DJANGO_DB_NAME', os.environ.get('POSTGRES_DB', 'chequestoredb')),
-        'USER': os.environ.get('DJANGO_DB_USER', os.environ.get('POSTGRES_USER', 'chequestoreuser')),
-        'PASSWORD': os.environ.get('DJANGO_DB_PASSWORD', os.environ.get('POSTGRES_PASSWORD', 'adam01')),
-        'HOST': os.environ.get('DJANGO_DB_HOST', os.environ.get('DB_HOST', 'localhost')),
-        'PORT': os.environ.get('DJANGO_DB_PORT', os.environ.get('DB_PORT', '5432')),
+
+DB_NAME = os.environ.get('POSTGRES_DB')
+
+if DB_NAME:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': DB_NAME,
+            'USER': os.environ.get('POSTGRES_USER'),
+            'PASSWORD': os.environ.get('PASSWORD'),
+            'HOST': os.environ.get('POSTGRES_HOST', 'db'),
+            'PORT': os.environ.get('POSTGRES_PORT', '5432'),
+            'CONN_MAX_AGE': 60,
+        }
     }
-}
+else:
+    # Development: Use SQLite
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
+
+
+# production Database settings for PostgreSQL in docker container
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.postgresql',
+#         'NAME': os.environ.get('DJANGO_DB_NAME', os.environ.get('POSTGRES_DB', 'chequestoredb')),
+#         'USER': os.environ.get('DJANGO_DB_USER', os.environ.get('POSTGRES_USER', 'chequestoreuser')),
+#         'PASSWORD': os.environ.get('DJANGO_DB_PASSWORD', os.environ.get('POSTGRES_PASSWORD', 'adam01')),
+#         'HOST': os.environ.get('DJANGO_DB_HOST', os.environ.get('DB_HOST', 'localhost')),
+#         'PORT': os.environ.get('DJANGO_DB_PORT', os.environ.get('DB_PORT', '5432')),
+#     }
+# }
 
 #Development Database settings for PostgreSQL localhost
 # DATABASES = {
