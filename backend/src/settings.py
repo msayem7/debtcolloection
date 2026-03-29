@@ -232,7 +232,7 @@ if DB_NAME:
             'ENGINE': 'django.db.backends.postgresql',
             'NAME': DB_NAME,
             'USER': os.environ.get('POSTGRES_USER'),
-            'PASSWORD': os.environ.get('PASSWORD'),
+            'PASSWORD': os.environ.get('POSTGRES_PASSWORD'),
             'HOST': os.environ.get('POSTGRES_HOST', 'db'),
             'PORT': os.environ.get('POSTGRES_PORT', '5432'),
             'CONN_MAX_AGE': 60,
