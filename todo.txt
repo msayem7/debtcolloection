@@ -4,3 +4,10 @@
 30. run the project
 40. Bind to git
 50. Deploy
+
+
+
+1. Create or update Dockerfile for backend and frontend
+    Question: Should there a .conf file for frontend folder and fronend docker file
+2. Create nginx in frontend
+3. health check

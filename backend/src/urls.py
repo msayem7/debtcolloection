@@ -1,9 +1,10 @@
+from django.http import JsonResponse
 from django.views.decorators.cache import never_cache
 
 from django.contrib import admin
 from django.urls import path, include
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
-#media serving to urls.py: 
+#media serving to urls.py:
 from django.conf import settings
 from django.conf.urls.static import static
 from cheques.views import CustomTokenObtainPairView, user_detail
@@ -11,7 +12,12 @@ from cheques.views import ParentCustomerDueReport
  #, CIvsChequeReportView
 # from cheques.views import frontend_config
 
+
+def health_check(request):
+    return JsonResponse({"status": "ok"})
+
 urlpatterns = [
+    path('api/health/', health_check, name='health_check'),
     path('admin/', admin.site.urls),
      path('v1/chq/parent-customer-due-report/', ParentCustomerDueReport.as_view(), name='parent-customer-due-report'),
     # path('v1/chq/unallocated-payments/', unallocated_payments, name='unallocated-payments'),

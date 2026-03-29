@@ -1,51 +1,42 @@
-FROM python:3.10.14-slim-bookworm as builder
+# Backend Dockerfile for Django + Gunicorn
+FROM python:3.11-slim
 
+# Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+
+# Set work directory
 WORKDIR /app
 
-# Install build dependencies
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends gcc python3-dev libpq-dev && \
-    rm -rf /var/lib/apt/lists/*
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+  libpq-dev \
+  gcc \
+  && rm -rf /var/lib/apt/lists/*
 
-# Copy and install requirements
-COPY requirements.txt .
+# Install Python dependencies
+COPY requirements.txt /app/
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Copy project
+COPY . /app/
 
-FROM python:3.10.14-slim-bookworm
+# Create logs directory
+RUN mkdir -p /app/logs
 
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
+# Collect static files
+RUN python manage.py collectstatic --noinput --clear 2>/dev/null || true
 
-WORKDIR /app
+# Create non-root user for security
+RUN adduser --disabled-password --gecos '' appuser && chown -R appuser:appuser /app
+USER appuser
 
-# Install runtime dependencies including netcat
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends libpq5 netcat-openbsd && \
-    rm -rf /var/lib/apt/lists/*
+# Expose port
+EXPOSE 8000
 
-# Copy installed packages from builder stage
-COPY --from=builder /usr/local/lib/python3.10/site-packages /usr/local/lib/python3.10/site-packages
-COPY --from=builder /usr/local/bin /usr/local/bin
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health/')" || exit 1
 
-# Create non-root user and set permissions
-RUN addgroup --system app && adduser --system --ingroup app app
-
-# Create staticfiles directory with proper permissions BEFORE copying code
-RUN mkdir -p /app/staticfiles && chown -R app:app /app/staticfiles
-
-# Copy project code and entrypoint script
-COPY . .
-COPY entrypoint.sh /entrypoint.sh
-
-# Set execute permissions and fix ownership
-RUN chmod +x /entrypoint.sh && \
-    chown -R app:app /app
-
-USER app
-
-EXPOSE 9000
-
-ENTRYPOINT ["/entrypoint.sh"]
+# Run Gunicorn
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "3", "--threads", "2", "src.wsgi:application"]

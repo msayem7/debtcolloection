@@ -39,6 +39,12 @@ scripts/
 .env
 .env.local
 .env.*.local
+.env.prod
+
+#docker
+docker-compose.stage.yml
+docker
+Dockerfile.old
 
 # IDE
 .vscode/
