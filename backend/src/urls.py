@@ -14,7 +14,7 @@ from cheques.views import ParentCustomerDueReport
 
 
 def health_check(request):
-    return JsonResponse({"status": "ok"})
+    return JsonResponse({"status": "ok"}, status=200)
 
 urlpatterns = [
     path('api/health/', health_check, name='health_check'),

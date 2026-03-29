@@ -38,7 +38,7 @@ services:
         condition: service_healthy
     # REMOVED the command section - now handled by entrypoint.sh
     expose:
-      - "9000"
+      - "8000"
   
   nginx:
     image: nginx:1.25-alpine
