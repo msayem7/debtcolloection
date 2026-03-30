@@ -52,7 +52,7 @@ services:
     build:
       context: ./${FRONTEND_DIR:-frontend}
       args:
-        VITE_API_URL: ${VITE_API_URL}
+        VUE_APP_API_BASE_URL: ${VUE_APP_API_BASE_URL}
     image: ${APP_NAME}-frontend:latest
     restart: unless-stopped
     networks:

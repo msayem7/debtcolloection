@@ -13,9 +13,9 @@ RUN npm ci --silent
 # Copy source code
 COPY . .
 
-# Build argument for API URL
-ARG VITE_API_URL=http://localhost:8000/api
-ENV VITE_API_URL=$VITE_API_URL
+# Build argument for API URL (Vue CLI uses VUE_APP_ prefix)
+ARG VUE_APP_API_BASE_URL=http://localhost:8000
+ENV VUE_APP_API_BASE_URL=$VUE_APP_API_BASE_URL
 
 # Fix permissions for node_modules binaries
 RUN chmod -R +x node_modules/.bin || true
