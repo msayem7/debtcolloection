@@ -1,0 +1,12 @@
+Critical Bugs: 
+1. Have  payment but not in payment details table (Payment Id 41,42). Need to fix the bug immediately.
+    how to find out root cause:
+       a. check code for partial commit or update or delete
+2. Shortage amount is not calculated correctly. Need to fix the bug immediately.
+    Status: solved. 
+     no issue foun
+
+3. Claim and checque/Cash collection is showing by swapping there position in payment details grid. 
+    a. Execute update queries to update table values in payment table 
+    b. Need to fix configurtion "Intrument Type". Cash and cheque will be cash equivalent and claim will be not cash equivalent
+4. 

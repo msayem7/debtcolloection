@@ -14,9 +14,10 @@ from django.core.exceptions import ValidationError
 from django.db import connection, transaction, IntegrityError
 from django.db.models import (
     F, Sum,Value, DecimalField,IntegerField, ExpressionWrapper, DurationField, DateField,
-    Subquery, OuterRef, Q, Case, When
+    Subquery, OuterRef, Q, Case, When, Func
 )
 from django.db.models.functions import Coalesce, Cast, Concat
+
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404
 from django.views.decorators.cache import never_cache
@@ -222,14 +223,15 @@ class CreditInvoiceViewSet(viewsets.ModelViewSet):
             # Handle matured dues if report_date is provided
             if report_date:
                 try:
-                    report_date = datetime.strptime(report_date, '%Y-%m-%d').date()
-                    # Use ExpressionWrapper to calculate grace date for each invoice
+                    report_date_obj = datetime.strptime(report_date, '%Y-%m-%d').date()
+                    # Calculate grace date: transaction_date + payment_grace_days
+                    # This uses PostgreSQL-compatible date arithmetic
                     queryset = queryset.annotate(
                         grace_date=ExpressionWrapper(
-                            F('transaction_date') + timedelta(days=1) * F('payment_grace_days'),
+                            F('transaction_date') + (F('payment_grace_days') * timedelta(days=1)),
                             output_field=DateField()
                         )
-                    ).filter(grace_date__lte=report_date)
+                    ).filter(grace_date__lte=report_date_obj)
                 except ValueError:
                     pass  # Ignore invalid date format
         elif payment_status.lower() == 'paid' or payment_status.lower() == 'all':
@@ -678,7 +680,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
 
 class ClaimFilter(FilterSet):
     customer = CharFilter(field_name='payment_details__payment__customer__alias_id', lookup_expr='icontains')
-    instrument = CharFilter(field_name='payment_details__payment_instrument__serial_no', lookup_expr='exact')
+    instrument = CharFilter(field_name='payment_details__payment_instrument__id', lookup_expr='exact')
     claim_date = DateFilter(field_name='payment_details__payment__received_date', lookup_expr='gte')
 
     # Range filters for claim_amount, refund_amount, and remaining_amount
@@ -733,6 +735,7 @@ class ClaimViewSet(viewsets.ModelViewSet):
         'payment_details__payment__customer__alias_id',
         'payment_details__payment_instrument__instrument_name',
     ]
+    
     # Add this line to enable pagination for this ViewSet
     # pagination_class = StandardResultsSetPagination
 

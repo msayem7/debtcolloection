@@ -83,3 +83,7 @@ pnpm-debug.log*
 *.bak
 *.tmp
 *.orig
+
+#ignore claude or kilo folders
+.claude/
+.kilo/

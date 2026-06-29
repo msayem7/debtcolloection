@@ -37,7 +37,15 @@ SECRET_KEY = config('SECRET_KEY', default='django-insecure-i+a!0^q$gt^l9-ecyasa@
 
 # SECURITY WARNING: don't run with debug turned on in production!
 # DEBUG = os.environ.get('DJANGO_DEBUG', '') != 'False'
-DEBUG = config('DEBUG', default=True, cast=bool)
+def _safe_cast_bool(value):
+    """Safely cast a value to boolean, handling non-standard values."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.lower() in ('true', '1', 'yes', 'on')
+    return bool(value)
+
+DEBUG = config('DEBUG', default=True, cast=_safe_cast_bool)
 
 
 
@@ -86,7 +94,7 @@ MIDDLEWARE = [
 CORS_ALLOW_ALL_ORIGINS = False
 
 # CORS Configuration (for frontend)
-cors_origins = os.environ.get('CORS_ALLOWED_ORIGINS', 'http://localhost:5173,http://localhost:3000,http://localhost:8080,http://127.0.0.1:5173')
+cors_origins = os.environ.get('CORS_ALLOWED_ORIGINS', 'http://localhost:5173,http://localhost:3000,http://localhost:8080,http://localhost:8090,http://127.0.0.1:5173')
 CORS_ALLOWED_ORIGINS = [origin.strip() for origin in cors_origins.split(',') if origin.strip()]
 CORS_ALLOW_CREDENTIALS = True
 CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in cors_origins.split(',') if origin.strip()]
@@ -224,28 +232,19 @@ WSGI_APPLICATION = 'src.wsgi.application'
 # }
 
 
-DB_NAME = os.environ.get('POSTGRES_DB')
-
-if DB_NAME:
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.postgresql',
-            'NAME': DB_NAME,
-            'USER': os.environ.get('POSTGRES_USER'),
-            'PASSWORD': os.environ.get('POSTGRES_PASSWORD'),
-            'HOST': os.environ.get('POSTGRES_HOST', 'db'),
-            'PORT': os.environ.get('POSTGRES_PORT', '5432'),
-            'CONN_MAX_AGE': 60,
-        }
+# Development Database: PostgreSQL (same as production)
+# Supports both Docker Compose (DJANGO_DB_*) and local development (POSTGRES_*) env vars
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.environ.get('DJANGO_DB_NAME') or os.environ.get('POSTGRES_DB', 'debtcollection'),
+        'USER': os.environ.get('DJANGO_DB_USER') or os.environ.get('POSTGRES_USER', 'postgres'),
+        'PASSWORD': os.environ.get('DJANGO_DB_PASSWORD') or os.environ.get('POSTGRES_PASSWORD', 'postgres'),
+        'HOST': os.environ.get('DJANGO_DB_HOST') or os.environ.get('POSTGRES_HOST', 'localhost'),
+        'PORT': os.environ.get('DJANGO_DB_PORT') or os.environ.get('POSTGRES_PORT', '5432'),
+        'CONN_MAX_AGE': 60,
     }
-else:
-    # Development: Use SQLite
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db.sqlite3',
-        }
-    }
+}
 
 
 # production Database settings for PostgreSQL in docker container

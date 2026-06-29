@@ -48,7 +48,7 @@ services:
       start_period: 60s
       retries: 3
 
-  frontend:
+  frontendHey, Cortana. :
     build:
       context: ./${FRONTEND_DIR:-frontend}
       args:
@@ -74,4 +74,4 @@ networks:
   backend:
     driver: bridge
   web_gateway:
-    external: true
+    external: trueHey, Cortana. Hey, Cortana. Hey, Cortana. 

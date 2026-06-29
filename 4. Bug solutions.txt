@@ -1,0 +1,81 @@
+2. Shortage amount is not calculated correctly. Need to fix the bug immediately.
+      a. No shortage problem. checked by this query
+          SELECT 
+              p.id,
+              p.alias_id,
+              p.shortage_amount AS stored_shortage,
+              COALESCE(inv.selected_amount, 0) - COALESCE(det.payment_amount, 0) AS calculated_shortage,
+              p.shortage_amount - (COALESCE(inv.selected_amount, 0) - COALESCE(det.payment_amount, 0)) AS difference,
+              CASE 
+                  WHEN p.shortage_amount = COALESCE(inv.selected_amount, 0) - COALESCE(det.payment_amount, 0)
+                  THEN 'OK'
+                  ELSE 'MISMATCH'
+              END AS status
+          FROM payment p
+          LEFT JOIN (
+              SELECT payment_id, SUM(sales_amount - sales_return) AS selected_amount
+              FROM credit_invoice
+              WHERE payment_id IS NOT NULL
+              GROUP BY payment_id
+          ) inv ON inv.payment_id = p.id
+          LEFT JOIN (
+              SELECT payment_id, SUM(amount) AS payment_amount
+              FROM payment_details
+              GROUP BY payment_id
+          ) det ON det.payment_id = p.id
+          ORDER BY p.id;
+
+3. Claim and checque/Cash collection is showing by swapping there position in payment details grid. 
+    Root Cause: 
+      1. Cheque is  marked as not cash equivalent in payment  instrument type table, as a result it was  calculate as claim or not calculate as cash in payment table but detail was not impacted
+      2. Claim  is marked as cash equivalent in payment instrument type table as a result it was not calculate as claim or  calculate as cash in payment table but detail was not impacted
+      3. Claim type serial no is 1 instead of 3. Claim type Serial must be 3. 
+      4. due to point 3 Data is not inserted into claim table. Claim is creatted while payment is created. and later on update refund information.
+    Solution:
+    a. Execute update queries to update table values in payment table 
+        UPDATE payment p
+        SET
+            claim_amount          = COALESCE(detail_agg.claim_sum, 0),
+            cash_equivalent_amount = COALESCE(detail_agg.cash_eq_sum, 0)
+        FROM (
+            SELECT
+                pd.payment_id,
+                SUM(pd.amount) FILTER (WHERE pit.id = 3)       AS claim_sum,
+                SUM(pd.amount) FILTER (WHERE pit.id IS DISTINCT FROM 3) AS cash_eq_sum
+            FROM payment_details pd
+            JOIN payment_instrument pi ON pi.id = pd.payment_instrument_id
+            JOIN payment_instrument_type pit ON pit.id = pi.instrument_type_id
+            GROUP BY pd.payment_id
+        ) detail_agg
+        WHERE p.id = detail_agg.payment_id;
+    b. Update Cash equivalent. Marked Cheque as Cash equivalent and Claim as not cash equivalent after login as Admin
+    c. Update Claim type Serial to 3 after login as Admin
+    d. Update Claim table with payment id and payment details id.
+        INSERT INTO claim (branch_id, payment_details_id, alias_id, submitted_date, refund_amount, refund_date, remarks, updated_at, version)
+            SELECT
+                pd.branch_id,
+                pd.id                             AS payment_details_id,
+                -- Generate a unique alias_id (uses the same generate_slugify_id approach)
+                LOWER(
+                    SUBSTRING(
+                        MD5(RANDOM()::TEXT || pd.id::TEXT || NOW()::TEXT)
+                        FROM 1 FOR 8
+                    )
+                )                                 AS alias_id,
+                NULL                              AS submitted_date,
+                0.0                               AS refund_amount,
+                NULL                              AS refund_date,
+                NULL                              AS remarks,
+                NOW()                             AS updated_at,
+                1                                 AS version
+            FROM payment_details pd
+            JOIN payment_instrument pi
+                ON pi.id = pd.payment_instrument_id
+            JOIN payment_instrument_type pit
+                ON pit.id = pi.instrument_type_id
+            LEFT JOIN claim c
+                ON c.payment_details_id = pd.id
+            WHERE pit.serial_no = 3
+            AND c.id IS null order by payment_id;
+
+    
