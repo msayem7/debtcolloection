@@ -1,0 +1,18 @@
+# Node dependencies (The biggest culprit!)
+**/node_modules
+**/.npm
+
+# Build outputs
+**/dist
+**/build
+**/.next
+**/out
+
+# Local development/OS junk
+**/.git
+**/.gitignore
+**/.vscode
+**/.idea
+**/*.log
+.DS_Store
+Thumbs.db

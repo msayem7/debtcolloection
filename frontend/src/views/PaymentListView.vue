@@ -270,9 +270,9 @@ const loadPayments = async () => {
       // total_pages: response.data.total_pages,
       // total_items: response.data.total_items      
       }    
-    console.log('Payments list response.data:', response.data)
-    console.log('Payments list response.data.results:', response.data.results)
-    console.log('Payments list payments.value:', payments.value)
+    // console.log('Payments list response.data:', response.data)
+    // console.log('Payments list response.data.results:', response.data.results)
+    // console.log('Payments list payments.value:', payments.value)
 
   } catch (error) {
     console.error('Error loading payments:', error);
@@ -368,28 +368,9 @@ const claimAmount = (payment) => {
   }, 0);
 }
 
-// const cashAndBankAmount = (payment) => {
-//   return payment.payment_details.reduce((sum, detail) => {
-//     console.log('cashAndBank Amount detail instrument type:', detail.instrument_type, detail.instrument_type === 1,detail.instrument_type === 2, detail.instrument_type === 3 )
-//     if (detail.instrument_type === 1 || detail.instrument_type === 2) {
-//       return sum + parseFloat(detail.amount)
-//     }
-//   }, 0)
-// }
-
-// const claimAmount = (payment) => {
-//   return payment.payment_details.reduce((sum, detail) => {
-//     console.log('cashAndBank Amount detail instrument type:', detail.instrument_type, detail.instrument_type === 1,detail.instrument_type === 2,detail.instrument_type === 3) 
-//     // console.log('claim Amount detail instrument type:', detail)
-//     if (detail.instrument_type === 3) {
-//       return sum + parseFloat(detail.amount)
-//     }
-//   }, 0)
-// }
-
 onMounted(() => {
   loadParentCustomers()
-  loadPayments()
+  //loadPayments()
 })
 </script>
 

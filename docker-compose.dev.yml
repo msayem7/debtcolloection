@@ -2,7 +2,7 @@ services:
   db:
     image: postgres:15
     ports:
-      - "55433:5432" # Maps host 55433 to container 5432
+      - "5544:5432" # Maps host 55433 to container 5432
     restart: unless-stopped
     env_file:
       - ./.env

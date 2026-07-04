@@ -1,13 +1,20 @@
-05. Create virtual environment and install dependencies, node etc 
-10. Modify env, .gitingore, docker-compose.yml, 
-20. create nginx 
-30. run the project
-40. Bind to git
-50. Deploy
-
-
 
 1. Create or update Dockerfile for backend and frontend
     Question: Should there a .conf file for frontend folder and fronend docker file
 2. Create nginx in frontend
 3. health check
+
+Feature: 
+1. Credit Invoice wise payment report
+2. Want to see payment detail against each invoice from invoice list. --- Done
+3. Add Feature "Save and Continue" :
+    a. Credit invoice entry
+    b. Payment 
+3. Entry using keyboard
+    a. Credit invoice entry
+    b. Payment
+    c. Claim
+    d. other UI
+
+4. Show data in grid and add pagination
+5. Convert data from excel

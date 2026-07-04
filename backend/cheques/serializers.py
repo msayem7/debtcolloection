@@ -93,7 +93,7 @@ class CreditInvoiceSerializer(serializers.ModelSerializer):
    
 
     payment = serializers.SlugRelatedField(slug_field='alias_id', required=False, allow_null=True, queryset=Payment.objects.all())
-    
+    payment_date = serializers.DateField(source='payment.received_date', read_only=True, allow_null=True)
     
     net_due = serializers.DecimalField(
         max_digits=18, 
@@ -104,9 +104,9 @@ class CreditInvoiceSerializer(serializers.ModelSerializer):
     class Meta:
         model = CreditInvoice
         fields = ('alias_id', 'branch', 'grn', 'customer','customer_name', 'transaction_date'
-                  ,'sales_amount','sales_return', 'net_due' ,'payment_grace_days', 'payment', 'status', 'version' #'allocated',
+                  ,'sales_amount','sales_return', 'net_due' ,'payment_grace_days', 'payment', 'payment_date', 'status', 'version' #'allocated',
                   )
-        read_only_fields = ('alias_id', 'version') #, 'updated_at', 'updated_by'
+        read_only_fields = ('alias_id', 'payment_date', 'version') #, 'updated_at', 'updated_by'
         optional_fields = ['payment']
     
        
@@ -122,6 +122,12 @@ class CreditInvoiceSerializer(serializers.ModelSerializer):
         instance = super().update(instance, validated_data)
         # self._handle_claims(instance, claims_data)
         return instance
+    
+    # def list(self, request, *args, **kwargs):
+    #     response = super().list(request, *args, **kwargs)
+    #     if latest := self.get_queryset().order_by('-transaction_date').first():
+    #         response.headers['Last-Modified'] = latest.updated_at.strftime('%a, %d %b %Y %H:%M:%S GMT')
+    #     return response
 
 
 # class InvoiceChequeMapSerializer(serializers.ModelSerializer):

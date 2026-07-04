@@ -199,7 +199,7 @@ class CreditInvoiceViewSet(viewsets.ModelViewSet):
         report_date = params.get('report_date')
 
         queryset = CreditInvoice.objects.all()
-        
+        print("date from: ", date_from, " date_to: ", date_to)
         # Apply filters
         if branch:
             queryset = queryset.filter(branch__alias_id=branch)
@@ -809,7 +809,11 @@ class ParentCustomerDueReport(APIView):
         if branch_alias_id:
             customer_qs = customer_qs.filter(branch__alias_id=branch_alias_id)
             invoice_qs = invoice_qs.filter(branch__alias_id=branch_alias_id)
-        
+        else :
+            return Response(
+                {"error": "Branch is mandatory"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
         # Query 1: Get all parent-child relationships with alias_id
         customer_hierarchy = Customer.objects.filter(
             ( Q(is_parent=True) | Q(parent__isnull=False))
@@ -830,8 +834,8 @@ class ParentCustomerDueReport(APIView):
                 output_field=IntegerField()
             )
         ).values('customer__alias_id').annotate(
-            matured_due=Sum('sales_amount', filter=Q(is_matured=1)),
-            immature_due=Sum('sales_amount', filter=Q(is_matured=0))
+            matured_due=Sum('sales_amount', filter=Q(is_matured=1)) - Sum('sales_return', filter=Q(is_matured=1)),
+            immature_due=Sum('sales_amount', filter=Q(is_matured=0))- Sum('sales_return', filter=Q(is_matured=0))
         )
         
         # Process in Python
