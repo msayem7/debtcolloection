@@ -9,4 +9,16 @@ Critical Bugs:
 3. Claim and checque/Cash collection is showing by swapping there position in payment details grid. 
     a. Execute update queries to update table values in payment table 
     b. Need to fix configurtion "Intrument Type". Cash and cheque will be cash equivalent and claim will be not cash equivalent
-4. 
+
+
+4. Implement validation logic on the Credit Invoice Entry Page: if both the Sales amount and the Return amount are zero, prevent the user from saving the data and display a notification instructing them to enter at least one amount.
+
+5. in Credit Invoice Entry Page, I am using CustomerDropdown.vue To display custom parent and child  as dropdown list.
+    a. if I select parent customer and then select child customer, it works fine. But if I select first item "Select Customer" from child combo, then  system make both the parent and child customer value reset to blank selection.
+    b. initial value of both list is also blank. I want that initial value of parent list is "Select Parent Organization" and child list is "Select Customer".
+5.1After selecting parent customer, press tab to focus on branch name and press down arrow to select next branch but both parent and child customer value reset to blank.
+
+X6. In Payment Entry Page, I can't put Grace Period Without selecting a child customer, But when I reset the parent customer child customer value set to empty .....................
+X7. In Payment Entry Page, without selecing any customer, 
+    1. click on "save and continue" button, it shows error message"Object object", should show "Please select a customer" 
+    2. Clicking on save button it shows A snapshot of the UI. Instead it should shows  a message "Please select a customer". Also which code taking a snapshot I want to know.

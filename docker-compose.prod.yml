@@ -48,7 +48,7 @@ services:
       start_period: 60s
       retries: 3
 
-  frontendHey, Cortana. :
+  frontend:
     build:
       context: ./${FRONTEND_DIR:-frontend}
       args:

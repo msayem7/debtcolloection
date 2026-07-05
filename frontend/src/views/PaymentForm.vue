@@ -66,10 +66,10 @@
                   <table class="table table-bordered table-hover">
                     <thead class="table-light sticky-top">
                       <tr>
-                        <th style="width: 30%">Instrument*</th>
-                        <th style="width: 20%">ID Number</th>
-                        <th style="width: 20%">Amount*</th>
-                        <th style="width: 25%">Details</th>
+                        <th style="width: 15%">Instrument*</th>
+                        <th style="width: 15%">ID Number</th>
+                        <th style="width: 15%">Amount*</th>
+                        <th style="width: 50%">Details</th>
                         <th style="width: 5%"></th>
                       </tr>
                     </thead>
@@ -176,7 +176,7 @@
                             @change="toggleAllInvoices"
                           >
                         </th>
-                        <th style="width: 15%" @click="sortInvoices('transaction_date')">Date</th>
+                        <th style="width: 12%" @click="sortInvoices('transaction_date')">Date</th>
                         <th style="width: 15%" @click="sortInvoices('grn')">GRN</th>
                         <!--  customer..name-->
                         <th style="width: 25%" @click="sortInvoices('customer_name')">Customer</th> 
@@ -215,23 +215,24 @@
           </div>
 
           <!-- Summary Cards -->
-          <div class="row mt-3">
-            <div class="col-md-6">
+          <div class="row mt-4">
+            <div class="col-md-4">
               <div class="card">
                 <div class="card-body">
                   <h6>Payment Summary</h6>
                   <div class="row">
                     <div class="col-6">
                       <div>Total Payment Amount:</div>
-                      <div>Total Selected Invoices:</div>
+                      <div>Total Selected ({{ selectedInvoices.length }}) Invoices:</div>
                       <div class="fw-bold">Difference:</div>
                     </div>
                     <div class="col-6 text-end">
                       <div><strong>{{ formatNumber(totalPaymentAmount) }}</strong></div>
                       <div><strong>{{ formatNumber(totalSelectedAmount) }}</strong></div>
+                      
                       <div :class="{'text-danger': paymentDifference < 0, 'text-success': paymentDifference >= 0}">
-                        <strong>{{ formatNumber(Math.abs(paymentDifference)) }}</strong>
-                        ({{ paymentDifference < 0 ? 'Shortage' : 'Excess' }})
+                        ({{ paymentDifference < 0 ? 'Shortage' : 'Excess' }}) 
+                        <strong>{{ formatNumber(Math.abs(paymentDifference)) }}</strong>                        
                       </div>
                     </div>
                   </div>
@@ -273,7 +274,7 @@ const branchStore = useBranchStore()
 
 // Split panel drag functionality
 const isDragging = ref(false)
-const leftPanelWidth = ref(40) // Initial width percentage for left panel
+const leftPanelWidth = ref(50) // Initial width percentage for left panel
 
 // eslint-disable-next-line
 const startDrag = (e) => {

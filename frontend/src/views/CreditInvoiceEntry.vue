@@ -154,7 +154,27 @@
         </div> -->
 
         <!-- Action Buttons -->
+        <!-- <div class="col-12">
+          <button type="submit" class="btn btn-primary me-2" :disabled="submitting">
+            <span v-if="submitting" class="spinner-border spinner-border-sm" role="status"></span>
+            {{ submitting ? 'Saving...' : 'Save' }}
+          </button>
+          <router-link to="/credit-invoices" class="btn btn-secondary">Cancel</router-link>
+        </div> -->
+        <!-- Action Buttons -->
         <div class="col-12">
+          <!-- "Save and Continue" — only in Create mode -->
+          <button
+            v-if="!editing"
+            type="button"
+            class="btn btn-success me-2"
+            :disabled="submitting"
+            @click="handleSaveAndContinue"
+          >
+            <span v-if="submitting" class="spinner-border spinner-border-sm" role="status"></span>
+            {{ submitting ? 'Saving...' : 'Save and Continue' }}
+          </button>
+
           <button type="submit" class="btn btn-primary me-2" :disabled="submitting">
             <span v-if="submitting" class="spinner-border spinner-border-sm" role="status"></span>
             {{ submitting ? 'Saving...' : 'Save' }}
@@ -378,25 +398,14 @@ const handleSubmit = async () => {
     
     formData.append('branch', branch)
 
-    // Object.entries({
-    //   ...form.value,
-    //   customer: customerAliasId
-    // }).forEach(([key, val]) => {
-    //   if (key === 'invoice_image') {
-    //     if (val instanceof File) formData.append(key, val)
-    //   } else if (key !== 'version') {
-    //     formData.append(key, val)
-    //   }
-    // })
-    
-    // formData.append('branch', branch)
-    // eslint-disable-next-line 
     const response = await axios({
       method: editing.value ? 'put' : 'post',
       url: editing.value ? `/v1/chq/credit-invoices/${invoiceId.value}/` : '/v1/chq/credit-invoices/',
       data: formData,
       headers: { 'Content-Type': 'multipart/form-data' }
     })
+
+    print(response)
 
     router.push('/credit-invoices')
   } catch (error) {
@@ -406,129 +415,79 @@ const handleSubmit = async () => {
   }
 }
 
-// Update handleSubmit to send just the customer alias_id:
-// const handleSubmit = async () => {
-//   try {
-//     submitting.value = true
-//     const branch = localStorage.getItem('workingOffice')
-//     if (!branch) throw new Error('Select a working office first')
-    
-//     const formData = new FormData()
-//     formData.append('version', form.value.version)
-    
-//     // Convert customer object to just the alias_id for the API
-//     const customerAliasId = form.value.customer?.alias_id || form.value.
-//     // const customerAliasId = typeof form.value.customer === 'object' 
-//     //   ? form.value.customer.alias_id 
-//     //   : form.value.customer
-      
-//     Object.entries({
-//       ...form.value,
-//       customer: customerAliasId
-//     }).forEach(([key, val]) => {
-//       if (key === 'invoice_image') {
-//         if (val instanceof File) formData.append(key, val)
-//       } else if (key !== 'version') {
-//         formData.append(key, val)
-//       }
-//     })
-    
-//     formData.append('branch', branch)
 
-//     const response = await axios({
-//       method: editing.value ? 'put' : 'post',
-//       url: editing.value ? `/v1/chq/credit-invoices/${invoiceId.value}/` : '/v1/chq/credit-invoices/',
-//       data: formData,
-//       headers: { 'Content-Type': 'multipart/form-data' }
-//     })
+"handle Save and Continue button's function"
+const handleSaveAndContinue = async () => {
+  try {
+    submitting.value = true
+    const branch = localStorage.getItem('workingOffice')
+    if (!branch) throw new Error('Select a working office first')
 
-//     router.push('/credit-invoices')
-//   } catch (error) {
-//     alert(error.response?.data?.error || error.message)
-//   } finally {
-//     submitting.value = false
-//   }
-// }
+    const formData = new FormData()
+    formData.append('version', form.value.version)
 
-// const fetchInvoice = async () => {
-//   try {
-//     loading.value = true
-//     const { data } = await axios.get(`/v1/chq/credit-invoices/${invoiceId.value}/`)
-    
-//     form.value = {
-//       ...data,
-//       customer: data.customer, // Direct assignment of alias_id
-//       version: data.version
-//     }
-//     // console.log('Form value: ',form.value)
+    const customerAliasId = form.value.customer?.alias_id || form.value.customer
 
-//     if (data.invoice_image) {
-//       existingImageUrl.value = data.invoice_image
-//     }
+    const formDataToSend = {
+      ...form.value,
+      customer: customerAliasId
+    }
 
-//     // Verify customer exists in loaded list
-//     await nextTick()
-//     if (!customers.value.some(c => c.alias_id === form.value.customer)) {
-//       customerError.value = 'Selected customer not found in current list'
-//     }
-//   } catch (error) {
-//     alert(error.response?.data?.error || 'Failed to load invoice')
-//     router.push('/credit-invoices')
-//   } finally {
-//     loading.value = false
-//   }
-// }
+    if (formDataToSend.payment === null) {
+      delete formDataToSend.payment
+    }
 
-// // Form submission
-// const handleSubmit = async () => {
-//   try {
-//     submitting.value = true
-//     const branch = localStorage.getItem('workingOffice')
-//     if (!branch) throw new Error('Select a working office first')
-    
-//     // Get claims data from child component
-//     // const allClaims = customerClaimsRef.value?.claims || []
-//     // const claimsToSave = allClaims.filter(c => {
-//     //   // Filter out zero amounts and invalid claims
-//     //   return Number(c.claim_amount) !== 0 && c.claim_amount !== ''
-//     // }).map(c => ({
-//     //   alias_id: c.alias_id,
-//     //   claim_amount: c.claim_amount,
-//     //   existing: c.existing
-//     // }))
+    Object.entries(formDataToSend).forEach(([key, val]) => {
+      if (key === 'invoice_image') {
+        if (val instanceof File) formData.append(key, val)
+      } else if (key !== 'version') {
+        formData.append(key, val)
+      }
+    })
 
-//     const formData = new FormData()
-//     formData.append('version', form.value.version)
-//     // formData.append('claims', JSON.stringify(claimsToSave))
-    
-//     Object.entries(form.value).forEach(([key, val]) => {
-//       if (key === 'invoice_image') {
-//         if (val instanceof File) formData.append(key, val)
-//       } else if (key !== 'version') {
-//         formData.append(key, val)
-//       }
-//     })
-    
-//     formData.append('branch', branch)
+    formData.append('branch', branch)
 
-//     const response = await axios({
-//       method: editing.value ? 'put' : 'post',
-//       url: editing.value ? `/v1/chq/credit-invoices/${invoiceId.value}/` : '/v1/chq/credit-invoices/',
-//       data: formData,
-//       headers: { 'Content-Type': 'multipart/form-data' }
-//     })
+    await axios({
+      method: 'post',
+      url: '/v1/chq/credit-invoices/',
+      data: formData,
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
 
-//     router.push('/credit-invoices')
-//   } catch (error) {
-//     alert(error.response?.data?.error || error.message)
-//   } finally {
-//     submitting.value = false
-//   }
-// }
+    // Remember last used customer and date for the next entry
+    const lastCustomer = form.value.customer
+    const lastDate = form.value.transaction_date
 
-// watch(() => store.selectedBranch, async () => {
-//   await fetchCustomers()
-// }, { immediate: true })
+    // Reset the form for a new entry
+    form.value = {
+      grn: '',
+      customer: lastCustomer,       // preserve customer
+      transaction_date: lastDate,    // preserve date
+      sales_amount: 0,
+      sales_return: 0,
+      invoice_image: null,
+      version: 1
+    }
+
+    // Reset image previews
+    imagePreview.value = null
+    existingImageUrl.value = null
+
+    // Clear the file input element
+    const fileInput = document.getElementById('invoiceImage')
+    if (fileInput) fileInput.value = ''
+
+    // Reset formatted fields
+    formattedSalesAmount.value = '0.00'
+    formattedSalesReturn.value = '0.00'
+
+  } catch (error) {
+    alert(error.response?.data?.error || error.message)
+  } finally {
+    submitting.value = false
+  }
+}
+
 
 watch(() => store.selectedBranch, (newBranch, oldBranch) => {
   if (oldBranch && newBranch !== oldBranch) {

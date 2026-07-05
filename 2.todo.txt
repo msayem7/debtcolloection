@@ -15,6 +15,7 @@ Feature:
     b. Payment
     c. Claim
     d. other UI
-
 4. Show data in grid and add pagination
 5. Convert data from excel
+6. Number of invoice in payment
+7. Only detail will expand
