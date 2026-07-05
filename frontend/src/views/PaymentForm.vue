@@ -42,7 +42,7 @@
                   id="customerSelect"
                   :disabled="isEditMode"
                 >
-                  <option value="Select a customer"></option>
+                  <option value="">Select a customer</option>
                   <option 
                     v-for="cust in parentCustomers" 
                     :value="cust.alias_id" 
@@ -709,6 +709,12 @@ const validateIdNumbers = () => {
 };
 
 const submitForm = async () => {
+  // Validate customer selection
+  if (!formData.value.customer) {
+    notificationStore.showError('Please select a customer')
+    isSubmitting.value = false
+    return
+  }
     isSubmitting.value = true
   errors.value = {}
   
@@ -720,7 +726,6 @@ const submitForm = async () => {
     return;
   }
 
-  isSubmitting.value = true
   errors.value = {}
 
   formData.value.payment_details.forEach(detail => {

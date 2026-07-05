@@ -68,8 +68,8 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue'])
 const customers = ref([])
 const parentOrganizations = ref([])
-const selectedParent = ref(null)
-const selectedCustomer = ref(null)
+const selectedParent = ref('')
+const selectedCustomer = ref('')
 const branchStore = useBranchStore()
 const loading = ref(false)
 
@@ -147,30 +147,35 @@ const loadCustomers = async () => {
 //   }
 // }
 
-const resetSelections = () => {
-  selectedParent.value = null
-  selectedCustomer.value = null
-  emit('update:modelValue', null)
-}
+// const resetSelections = () => {
+//   selectedParent.value = ''
+//   selectedCustomer.value = ''
+//   emit('update:modelValue', null)
+// }
 
 
 const onParentChange = () => {
-  selectedCustomer.value = null
-  // emit('update:modelValue', null)
+  selectedCustomer.value = ''
+  emit('update:modelValue', null)
 }
 
 const onCustomerChange = () => {
+  if (!selectedCustomer.value) {
+    // User selected "Select Customer" — emit null but DON'T reset parent
+    emit('update:modelValue', null)
+    return
+  }
   emit('update:modelValue', selectedCustomer.value)
 }
+// const onCustomerChange = () => {
+//   emit('update:modelValue', selectedCustomer.value)
+// }
 
 onMounted(loadCustomers)
 watch(() => props.modelValue, (newVal) => {
-  // console.log("watch triggered - newVal:", newVal)
-  // console.log("current customers:", customers.value)
-  // console.log("current parentOrganizations:", parentOrganizations.value)
-
   if (!newVal) {
-    resetSelections()
+    //resetSelections()
+    selectedCustomer.value = ''
     return
   }
 

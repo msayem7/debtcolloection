@@ -155,7 +155,7 @@
 
         <!-- Action Buttons -->
         <!-- <div class="col-12">
-          <button type="submit" class="btn btn-primary me-2" :disabled="submitting">
+          <button type="button" class="btn btn-primary me-2" :disabled="submitting" @click="handleSubmit">
             <span v-if="submitting" class="spinner-border spinner-border-sm" role="status"></span>
             {{ submitting ? 'Saving...' : 'Save' }}
           </button>
@@ -163,22 +163,11 @@
         </div> -->
         <!-- Action Buttons -->
         <div class="col-12">
-          <!-- "Save and Continue" — only in Create mode -->
-          <button
-            v-if="!editing"
-            type="button"
-            class="btn btn-success me-2"
-            :disabled="submitting"
-            @click="handleSaveAndContinue"
-          >
-            <span v-if="submitting" class="spinner-border spinner-border-sm" role="status"></span>
-            {{ submitting ? 'Saving...' : 'Save and Continue' }}
-          </button>
-
-          <button type="submit" class="btn btn-primary me-2" :disabled="submitting">
+          <button type="button" class="btn btn-primary me-2" :disabled="submitting" @click="handleSubmit">
             <span v-if="submitting" class="spinner-border spinner-border-sm" role="status"></span>
             {{ submitting ? 'Saving...' : 'Save' }}
           </button>
+          <router-link v-if="!editing" to="/credit-invoices" class="btn btn-info me-2">Invoice List</router-link>
           <router-link to="/credit-invoices" class="btn btn-secondary">Cancel</router-link>
         </div>
       </div>
@@ -191,6 +180,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from '@/plugins/axios'
 import { useBranchStore } from '@/stores/branchStore'
+import { useNotificationStore } from '@/stores/notificationStore'
 import CustomerDropdown from '@/components/CustomerDropdown.vue'
 // import CustomerClaims from '@/views/CustomerClaims.vue'
 //import { Number } from 'core-js'
@@ -200,6 +190,7 @@ import { formatNumber, parseNumber } from '@/utils/ezFormatter'
 const store = useBranchStore()
 const route = useRoute()
 const router = useRouter()
+const notificationStore = useNotificationStore()
 
 // State management
 const loading = ref(false)
@@ -366,11 +357,32 @@ const fetchInvoice = async () => {
   }
 }
 
+const validateAmounts = () => {
+  const amount = parseFloat(form.value.sales_amount) || 0
+  const ret = parseFloat(form.value.sales_return) || 0
+  return amount > 0 || ret > 0
+}
+
 const handleSubmit = async () => {
   try {
+    if (!validateAmounts()) {
+      notificationStore.showError('Please enter at least one amount (Sales Amount or Sales Return)')
+      submitting.value = false
+      return
+    }
     submitting.value = true
     const branch = localStorage.getItem('workingOffice')
     if (!branch) throw new Error('Select a working office first')
+    if (!form.value.customer) {
+      notificationStore.showError('Please select a customer')
+      submitting.value = false
+      return
+    }
+    if (!form.value.transaction_date) {
+      notificationStore.showError('Please select a transaction date')
+      submitting.value = false
+      return
+    }
     
     const formData = new FormData()
     formData.append('version', form.value.version)
@@ -398,16 +410,39 @@ const handleSubmit = async () => {
     
     formData.append('branch', branch)
 
-    const response = await axios({
+    await axios({
       method: editing.value ? 'put' : 'post',
       url: editing.value ? `/v1/chq/credit-invoices/${invoiceId.value}/` : '/v1/chq/credit-invoices/',
       data: formData,
       headers: { 'Content-Type': 'multipart/form-data' }
     })
 
-    print(response)
+    // print(response)
+    //console.log(response.data.Error)
 
-    router.push('/credit-invoices')
+    if (!editing.value) {
+      // Reset form fields for next entry, preserving customer and date
+      form.value.grn = ''
+      form.value.customer = ''
+      form.value.sales_amount = 0
+      form.value.sales_return = 0
+      form.value.invoice_image = null
+      form.value.version = 1
+
+      // Reset image previews
+      imagePreview.value = null
+      existingImageUrl.value = null
+
+      // Clear the file input element
+      const fileInput = document.getElementById('invoiceImage')
+      if (fileInput) fileInput.value = ''
+
+      // Reset formatted fields
+      formattedSalesAmount.value = '0.00'
+      formattedSalesReturn.value = '0.00'
+    } else {
+      router.push('/credit-invoices')
+    }
   } catch (error) {
     alert(error.response?.data?.error || error.message)
   } finally {
@@ -415,78 +450,6 @@ const handleSubmit = async () => {
   }
 }
 
-
-"handle Save and Continue button's function"
-const handleSaveAndContinue = async () => {
-  try {
-    submitting.value = true
-    const branch = localStorage.getItem('workingOffice')
-    if (!branch) throw new Error('Select a working office first')
-
-    const formData = new FormData()
-    formData.append('version', form.value.version)
-
-    const customerAliasId = form.value.customer?.alias_id || form.value.customer
-
-    const formDataToSend = {
-      ...form.value,
-      customer: customerAliasId
-    }
-
-    if (formDataToSend.payment === null) {
-      delete formDataToSend.payment
-    }
-
-    Object.entries(formDataToSend).forEach(([key, val]) => {
-      if (key === 'invoice_image') {
-        if (val instanceof File) formData.append(key, val)
-      } else if (key !== 'version') {
-        formData.append(key, val)
-      }
-    })
-
-    formData.append('branch', branch)
-
-    await axios({
-      method: 'post',
-      url: '/v1/chq/credit-invoices/',
-      data: formData,
-      headers: { 'Content-Type': 'multipart/form-data' }
-    })
-
-    // Remember last used customer and date for the next entry
-    const lastCustomer = form.value.customer
-    const lastDate = form.value.transaction_date
-
-    // Reset the form for a new entry
-    form.value = {
-      grn: '',
-      customer: lastCustomer,       // preserve customer
-      transaction_date: lastDate,    // preserve date
-      sales_amount: 0,
-      sales_return: 0,
-      invoice_image: null,
-      version: 1
-    }
-
-    // Reset image previews
-    imagePreview.value = null
-    existingImageUrl.value = null
-
-    // Clear the file input element
-    const fileInput = document.getElementById('invoiceImage')
-    if (fileInput) fileInput.value = ''
-
-    // Reset formatted fields
-    formattedSalesAmount.value = '0.00'
-    formattedSalesReturn.value = '0.00'
-
-  } catch (error) {
-    alert(error.response?.data?.error || error.message)
-  } finally {
-    submitting.value = false
-  }
-}
 
 
 watch(() => store.selectedBranch, (newBranch, oldBranch) => {
@@ -520,3 +483,5 @@ onMounted(async () => {
 })
 
 </script>
+
+
