@@ -303,11 +303,17 @@ class CreditInvoiceViewSet(viewsets.ModelViewSet):
 
     @transaction.atomic
     def update(self, request, *args, **kwargs):
-
         instance = self.get_object()
+
+        if instance.payment and 'customer' in request.data:
+            return Response(
+                {'error': 'Cannot change customer after invoice has been paid'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         if int(request.data.get('version')) != instance.version:
             return Response({'error': 'Version conflict'}, status=status.HTTP_409_CONFLICT)
-        
+
         partial = kwargs.pop('partial', False)
         serializer = self.get_serializer(
             instance, 
@@ -315,10 +321,8 @@ class CreditInvoiceViewSet(viewsets.ModelViewSet):
             partial=partial
         )
         serializer.is_valid(raise_exception=True)
-    #     if 'customer' in validated_data:
-    #         validated_data['payment_grace_days'] = validated_data['customer'].grace_days 
         serializer.save(updated_by=request.user, version=instance.version + 1)
-        
+
         return Response(serializer.data)
 
     @method_decorator(never_cache)  # 👈 Disable caching

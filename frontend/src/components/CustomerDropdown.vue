@@ -8,7 +8,7 @@
         class="form-select"
         :class="{ 'is-invalid': error }"
         @change="onParentChange"
-        :disabled="loading"
+        :disabled="loading || props.disabled"
       >
         <option value="">Select Parent Organization</option>
         <option 
@@ -28,7 +28,7 @@
         v-model="selectedCustomer"
         class="form-select"
         :class="{ 'is-invalid': error }"
-        :disabled="!selectedParent || loading"
+        :disabled="!selectedParent || loading || props.disabled"
         @change="onCustomerChange"
       >
         <option value="">Select Customer</option>
@@ -53,14 +53,17 @@ import axios from '@/plugins/axios'
 const props = defineProps({ 
   modelValue: [Object, String],
   error: String,
+  disabled: {
+    type: Boolean,
+    default: false
+  },
   showLabels: {
     type: Boolean,
     default: true
   },
   layout: {
     type: String,
-    default: 'side-by-side', // or 'stacked'
-    //validator: (value) => ['side-by-side', 'stacked'].includes(value)
+    default: 'side-by-side',
   }
 })
 

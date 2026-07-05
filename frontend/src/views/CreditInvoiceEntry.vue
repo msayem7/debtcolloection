@@ -26,6 +26,7 @@
           <CustomerDropdown
             v-model="form.customer"
             :error="customerError"
+            :disabled="isPaid"
             required
           />
         </div>
@@ -247,6 +248,10 @@ const updateSalesReturn = () => {
 //   const customer = customers.value.find(c => c.alias_id === form.value.customer)
 //   return customer?.grace_days || 0
 // })
+
+const isPaid = computed(() => {
+  return editing.value && !!form.value.payment
+})
 
 const paymentDate = computed(() => {
   if (!form.value.transaction_date) return ''

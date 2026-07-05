@@ -24,11 +24,3 @@ Feature:
 b. Modify save buttons functionality. Functionalilty of "save and continue" will merge with save Button's functionality. Save button will not redirect to "CreditInvoiceList.vue" page . 
 c. Finaly 'Save and continue button" will remove.  I want to see the summary of this impact before implement.
 
-Modify Save button of CreditInvoiceEntry.vue for new invoice entry with following tasks:  
-a. validate and save data
-b. for new entry, make the page ready for next new entry and show the "parent organization" and "transaction date" fields value from last saved data. 
-
- 5.1 Remove commented-out "Save and Continue" block (if any leftover in the template).
- 5.2 Remove the now-unused handleSaveAndContinue() function from <script setup>.
- 5.3 Verify all imports are still needed (no orphaned imports).
- 5.4 Run npm run lint (or project equivalent) to catch syntax/formatting issues.
