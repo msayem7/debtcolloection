@@ -199,7 +199,7 @@ class CreditInvoiceViewSet(viewsets.ModelViewSet):
         report_date = params.get('report_date')
 
         queryset = CreditInvoice.objects.all()
-        print("date from: ", date_from, " date_to: ", date_to)
+        # print("date from: ", date_from, " date_to: ", date_to)
         # Apply filters
         if branch:
             queryset = queryset.filter(branch__alias_id=branch)

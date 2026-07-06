@@ -8,7 +8,7 @@ Feature:
 1. Credit Invoice wise payment report
 2. Want to see payment detail against each invoice from invoice list. --- Done
 3. Add Feature "Save and Continue" :
-    a. Credit invoice entry
+    a. Credit invoice entry -- done
     b. Payment 
 3. Entry using keyboard
     a. Credit invoice entry
