@@ -1,26 +1,32 @@
 
-1. Create or update Dockerfile for backend and frontend
+01. Create or update Dockerfile for backend and frontend
     Question: Should there a .conf file for frontend folder and fronend docker file
-2. Create nginx in frontend
-3. health check
+02. Create nginx in frontend
+03. health check
 
 Feature: 
-1. Credit Invoice wise payment report
-2. Want to see payment detail against each invoice from invoice list. --- Done
-3. Add Feature "Save and Continue" :
+01. Credit Invoice wise payment report
+02. Want to see payment detail against each invoice from invoice list. --- Done
+03. Add Feature "Save and Continue" :
     a. Credit invoice entry -- done
-    b. Payment 
-3. Entry using keyboard
+        Modify save buttons functionality. Functionalilty of "save and continue" will merge with save Button's functionality. Save button will not redirect to "CreditInvoiceList.vue" page . 
+        Finaly 'Save and continue button" will remove.  I want to see the summary of this impact before implement.
+    b. Payment -- not important now
+    
+03. Entry using keyboard
     a. Credit invoice entry
     b. Payment
     c. Claim
     d. other UI
-4. Show data in grid and add pagination
-5. Convert data from excel
-6. Number of invoice in payment
-7. Only detail will expand
+04. Show data in grid and add pagination
+05. Convert data from excel
+06. Number of invoice in payment
+07. Only detail will expand
 
+08. a. In payment entry page, add filter button to filter due invoices data in the grid at frontend. like invoice date range, child customer, GRN number, amount, matured invoices, show selected invoices only. 
+    b. split the page from top to grid end. Payment Date, parent customer,  and summary section will be displayed at left pannel and filter and invoicess will be displayed at right pannel.buttons will be displayed at bottom.
 
-b. Modify save buttons functionality. Functionalilty of "save and continue" will merge with save Button's functionality. Save button will not redirect to "CreditInvoiceList.vue" page . 
-c. Finaly 'Save and continue button" will remove.  I want to see the summary of this impact before implement.
+09. While doing a particular payment editing, typing perform very very slowly. like takes 5 seconds to refresh. thats entry is 23-may-2026, customer ACI logistics, 57 invoices against this payment. but other entries are not that much slow.
 
+10. Check Consistency page. It will run once a day before run invoices. It forcing user and keep a log. 
+12. 

@@ -69,6 +69,9 @@ class Customer(models.Model):
         db_table = 'customer'
         verbose_name = 'Customer'
         verbose_name_plural = 'Customers'
+        indexes = [
+            models.Index(fields=['parent'], name='idx_customer_parent_id'),
+        ]
 
     def __str__(self):
         return self.name
@@ -216,6 +219,13 @@ class CreditInvoice(models.Model):
         db_table = 'credit_invoice'
         verbose_name = 'Credit Invoice'
         verbose_name_plural = 'Credit Invoices'
+        indexes = [
+            models.Index(fields=['transaction_date'], name='idx_ci_transaction_date'),
+            models.Index(fields=['branch', 'transaction_date'], name='idx_ci_branch_date'),
+            models.Index(fields=['customer', 'transaction_date'], name='idx_ci_customer_date'),
+            models.Index(fields=['payment', 'transaction_date'], name='idx_ci_payment_date'),
+            models.Index(fields=['-updated_at'], name='idx_ci_updated_at'),
+        ]
 
     def __str__(self):
         grn_display = self.grn or ''

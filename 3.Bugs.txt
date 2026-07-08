@@ -22,7 +22,8 @@ ok 6. In Payment Entry Page, I can't put Grace Period Without selecting a child 
 X7. In Payment Entry Page, without selecing any customer, 
     1. click on "save and continue" button, it shows error message"Object object", should show "Please select a customer" 
    
+8. In "Invoice Entry" Page, after payment Parent Organization is not allow to edit.  --- Fixed
+9. {"error":"ID number 5042801 already exists in this branch"} --- If payment id already exists show a user friendly message. 
+    and for any generic error I want to see the original error below message as note. 
 
-
-8. In Invoice Entry Page, after payment Parent Organization is not allow to edit.
-9. 
+10. 
