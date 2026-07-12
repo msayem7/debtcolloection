@@ -100,6 +100,12 @@ const routes = [
       meta: { requiresAuth: true, hideNav: false }
     },
     {
+      path: '/reports/invoice',
+      name: 'CreditInvoiceReport',
+      component: () => import('@/views/reports/CreditInvoiceReport.vue'),
+      meta: { requiresAuth: true }
+    },
+    {
       path: '/reports/customer-statement',
       name: 'CustomerStatementReport',
       component: () => import('@/views/reports/CustomerStatementReport.vue'),
@@ -123,3 +129,4 @@ router.beforeEach((to, from, next) => {
 });
 
 export default router;
+

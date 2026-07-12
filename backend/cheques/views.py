@@ -18,7 +18,7 @@ from django.db.models import (
 )
 from django.db.models.functions import Coalesce, Cast, Concat
 
-from django.http import HttpResponse, JsonResponse
+from django.http import HttpResponse, JsonResponse, StreamingHttpResponse
 from django.shortcuts import get_object_or_404
 from django.views.decorators.cache import never_cache
 from django.utils.decorators import method_decorator
@@ -844,3 +844,658 @@ class ParentCustomerDueReport(APIView):
                 'total_due': grand_total_due
             }
         })
+# ==================== Credit Invoice Report Module ====================
+
+class CreditInvoiceReportView(APIView):
+    '''
+    Credit Invoice Report with filtering, pagination, PDF, Excel, CSV exports.
+    Endpoint: GET /v1/chq/reports/invoice/
+    '''
+    permission_classes = [IsAuthenticated]
+
+    # Query 1: Base Query
+    QUERY1 = '''
+        SELECT
+            ROW_NUMBER() OVER (
+                ORDER BY  p.received_date ASC NULLS LAST, ci.payment_id, ci.transaction_date 
+            ) AS sl_no, 
+            pc.name AS parent_organization,
+            c.name AS customer_name,
+            ci.transaction_date,
+            ci.payment_grace_days AS grace_days,
+            (ci.transaction_date + ci.payment_grace_days) Due_Date,
+            p.received_date,
+            ci.sales_amount,
+            ci.sales_return,
+            ci.sales_amount - ci.sales_return AS net_sales,
+            p.cash_equivalent_amount AS cheque_cash_amount,
+            p.claim_amount,
+            p.shortage_amount,
+            GREATEST(
+                COALESCE(p.received_date, %(report_date)s::date) - (ci.transaction_date + ci.payment_grace_days),
+                0
+            ) AS days_overdue,
+            p.alias_id payment_alias_id,
+            ci.payment_id as payment_SL
+        FROM credit_invoice ci
+        LEFT JOIN payment p ON p.id = ci.payment_id
+        LEFT JOIN customer c ON c.id = ci.customer_id
+        LEFT JOIN customer pc ON pc.id = c.parent_id AND pc.is_parent = TRUE
+        WHERE ci.branch_id = %(branch_id)s
+        {status_filter}
+        {parent_filter}
+        {child_filter}
+        {date_filter}
+        {return_filter}
+        ORDER BY p.received_date ASC NULLS LAST, ci.payment_id, ci.transaction_date
+    '''
+    # ORDER BY p.received_date DESC NULLS LAST, ci.payment_id, ci.transaction_date
+
+    # Query 2: Detailed Query (with instrument numbers)
+    QUERY2 = '''
+        WITH payment_summary AS (
+            SELECT
+                pd.payment_id,
+                STRING_AGG(pd.id_number, '; ') FILTER (WHERE pit.is_cash_equivalent) AS cheque_numbers,
+                SUM(pd.amount) FILTER (WHERE pit.is_cash_equivalent) AS cheque_cash_amount,
+                STRING_AGG(pd.id_number, '; ') FILTER (WHERE pit.is_cash_equivalent = FALSE) AS claim_numbers,
+                SUM(pd.amount) FILTER (WHERE pit.is_cash_equivalent = FALSE) AS claim_amount
+            FROM payment_details pd
+            JOIN payment_instrument pi ON pi.id = pd.payment_instrument_id
+            JOIN payment_instrument_type pit ON pit.id = pi.instrument_type_id
+            GROUP BY pd.payment_id
+        ),
+        invoices_ranked AS (
+            SELECT
+                pc.name AS parent_organization,
+                c.name AS customer_name,                
+                ci.customer_id, ci.transaction_date, ci.payment_grace_days,
+                ci.sales_amount, ci.sales_return,
+                (ci.sales_amount - ci.sales_return) AS net_sales,
+                p.received_date, ci.payment_id, p.shortage_amount,
+                p.alias_id payment_alias_id,
+                ROW_NUMBER() OVER (
+                    PARTITION BY ci.payment_id
+                    ORDER BY p.received_date ASC NULLS LAST, ci.payment_id, ci.transaction_date
+                ) AS serial_num
+            FROM credit_invoice ci
+            LEFT JOIN payment p ON p.id = ci.payment_id
+            LEFT JOIN customer c ON c.id = ci.customer_id
+            LEFT JOIN customer pc ON pc.id = c.parent_id AND pc.is_parent = TRUE
+            WHERE ci.branch_id = %(branch_id)s
+            {status_filter}
+            {parent_filter}
+            {child_filter}
+            {date_filter}
+            {return_filter}
+        )
+        SELECT
+            ROW_NUMBER() OVER (
+                ORDER BY  ci.received_date ASC NULLS LAST, ci.payment_id, ci.serial_num, ci.transaction_date 
+            ) AS sl_no, 
+	        serial_num,
+            ci.parent_organization,
+            ci.customer_name,
+            ci.transaction_date,
+            (ci.transaction_date + ci.payment_grace_days) Due_Date,
+            ci.received_date,
+            ci.sales_amount,
+            ci.sales_return,
+            ci.net_sales,
+            ps.cheque_numbers,
+            ps.cheque_cash_amount,
+            ps.claim_numbers,
+            ps.claim_amount,
+            case when ci.serial_num = 1 
+                then  ci.shortage_amount 
+                else 0 
+                end as shortage_amount,
+            GREATEST(
+                COALESCE(ci.received_date, %(report_date)s::date) - (ci.transaction_date + ci.payment_grace_days),
+                0
+            ) AS days_overdue,
+            ci.payment_grace_days as grace_days,
+            ci.payment_alias_id,
+            ci.serial_num as payment_SL
+        FROM invoices_ranked ci
+        LEFT JOIN payment_summary ps
+            ON ps.payment_id = ci.payment_id AND ci.serial_num = 1
+        ORDER BY sl_no, ci.serial_num, ci.transaction_date
+    '''
+    # ORDER BY ci.received_date DESC NULLS LAST, ci.payment_id, ci.serial_num, ci.transaction_date
+
+
+    # Count Query (for pagination)
+    COUNT_QUERY = '''
+        SELECT COUNT(*) AS total
+        FROM credit_invoice ci
+        LEFT JOIN payment p ON p.id = ci.payment_id
+        LEFT JOIN customer c ON c.id = ci.customer_id
+        LEFT JOIN customer pc ON pc.id = c.parent_id AND pc.is_parent = TRUE
+        WHERE ci.branch_id = %(branch_id)s
+        {status_filter}
+        {parent_filter}
+        {child_filter}
+        {date_filter}
+        {return_filter}
+    '''
+
+    # Totals Query (for report footer)
+    TOTALS_QUERY = '''
+        SELECT
+            COALESCE(SUM(ci.sales_amount), 0) AS total_sales_amount,
+            COALESCE(SUM(ci.sales_return), 0) AS total_sales_return,
+            COALESCE(SUM(ci.sales_amount - ci.sales_return), 0) AS total_net_sales
+        FROM credit_invoice ci
+        LEFT JOIN payment p ON p.id = ci.payment_id
+        LEFT JOIN customer c ON c.id = ci.customer_id
+        LEFT JOIN customer pc ON pc.id = c.parent_id AND pc.is_parent = TRUE
+        WHERE ci.branch_id = %(branch_id)s
+        {status_filter}
+        {parent_filter}
+        {child_filter}
+        {date_filter}
+        {return_filter}
+    '''
+
+    # Helper: Build filter snippets
+    def _build_filters(self, params):
+        snippets = {
+            'status_filter': '',
+            'parent_filter': '',
+            'child_filter': '',
+            'date_filter': '',
+            'return_filter': '',
+        }
+        extra_params = {}
+
+        status = params.get('status', 'all')
+        if status == 'due':
+            snippets['status_filter'] = (
+                " AND ci.payment_id IS NULL"
+                " AND (ci.transaction_date + ci.payment_grace_days) >= %(report_date)s::date"
+            )
+            extra_params['report_date'] = params['report_date']
+        elif status == 'matured_due':
+            snippets['status_filter'] = (
+                " AND ci.payment_id IS NULL"
+                " AND (ci.transaction_date + ci.payment_grace_days) < %(report_date)s::date"
+            )
+            extra_params['report_date'] = params['report_date']
+        elif status == 'paid':
+            snippets['status_filter'] = ' AND ci.payment_id IS NOT NULL'
+
+        # Customer hierarchy
+        parent_customer = params.get('parent_customer')
+        child_customer = params.get('child_customer')
+
+        if child_customer:
+            snippets['child_filter'] = " AND c.alias_id = %(child_customer)s"
+            extra_params['child_customer'] = child_customer
+        elif parent_customer:
+            snippets['parent_filter'] = " AND pc.alias_id = %(parent_customer)s"
+            extra_params['parent_customer'] = parent_customer
+
+        # Date filter - Received date mode only valid for 'all' and 'paid'
+        date_mode = params.get('date_mode', 'transaction_date')
+        if status in ('due', 'matured_due'):
+            date_mode = 'transaction_date'
+
+        date_from = params.get('date_from')
+        date_to = params.get('date_to')
+
+        if date_from and date_to:
+            col = 'p.received_date' if date_mode == 'received_date' else 'ci.transaction_date'
+            snippets['date_filter'] = f" AND {col} BETWEEN %(date_from)s::date AND %(date_to)s::date"
+            extra_params['date_from'] = date_from
+            extra_params['date_to'] = date_to
+        elif date_from:
+            col = 'p.received_date' if date_mode == 'received_date' else 'ci.transaction_date'
+            snippets['date_filter'] = f" AND {col} >= %(date_from)s::date"
+            extra_params['date_from'] = date_from
+        elif date_to:
+            col = 'p.received_date' if date_mode == 'received_date' else 'ci.transaction_date'
+            snippets['date_filter'] = f" AND {col} <= %(date_to)s::date"
+            extra_params['date_to'] = date_to
+
+        # Return only filter
+        if params.get('return_only') in (True, 'true', 'True', 1, '1'):
+            snippets['return_filter'] = ' AND ci.sales_return > 0'
+
+        return snippets, extra_params
+
+    def _get_common_params(self, request):
+        branch = request.query_params.get('branch')
+        if not branch:
+            raise ValidationError({'branch': 'Branch is required.'})
+
+        branch_obj = get_object_or_404(Branch, alias_id=branch)
+
+        today = timezone.now().date()
+        report_date = request.query_params.get('report_date', today.isoformat())
+
+        try:
+            report_date_obj = datetime.strptime(report_date, '%Y-%m-%d').date()
+        except ValueError:
+            raise ValidationError({'report_date': 'Invalid date format. Use YYYY-MM-DD.'})
+
+        date_to = request.query_params.get('date_to')
+        if date_to:
+            try:
+                date_to_obj = datetime.strptime(date_to, '%Y-%m-%d').date()
+                if report_date_obj < date_to_obj:
+                    raise ValidationError(
+                        {'report_date': 'Report date must be >= To date.'}
+                    )
+            except ValueError:
+                raise ValidationError({'date_to': 'Invalid date format. Use YYYY-MM-DD.'})
+
+        return {
+            'branch_id': branch_obj.id,
+            'report_date': report_date,
+            'status': request.query_params.get('status', 'all'),
+            'parent_customer': request.query_params.get('parent_customer'),
+            'child_customer': request.query_params.get('child_customer'),
+            'date_mode': request.query_params.get('date_mode', 'transaction_date'),
+            'date_from': request.query_params.get('date_from'),
+            'date_to': date_to,
+            'show_instrument_numbers': request.query_params.get(
+                'show_instrument_numbers', 'false'
+            ).lower() == 'true',
+            'return_only': request.query_params.get('return_only', 'false').lower() == 'true',
+        }
+
+    def _execute_query(self, sql_template, sql_params, filter_snippets):
+        sql = sql_template.format(**filter_snippets)
+        with connection.cursor() as cursor:
+            cursor.execute(sql, sql_params)
+            columns = [col[0] for col in cursor.description]
+            rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
+        return rows
+
+    def _get_data(self, params, use_query2=False):
+        filter_snippets, extra_params = self._build_filters(params)
+        query_template = self.QUERY2 if use_query2 else self.QUERY1
+        sql_params = {'branch_id': params['branch_id'], 'report_date': params['report_date']}
+        sql_params.update(extra_params)
+        return self._execute_query(query_template, sql_params, filter_snippets)
+
+    def _get_count_and_totals(self, params):
+        filter_snippets, extra_params = self._build_filters(params)
+        sql_params = {'branch_id': params['branch_id'], 'report_date': params.get('report_date', timezone.now().date().isoformat())}
+        sql_params.update(extra_params)
+
+        count_rows = self._execute_query(self.COUNT_QUERY, sql_params, filter_snippets)
+        total_count = count_rows[0]['total'] if count_rows else 0
+
+        total_rows = self._execute_query(self.TOTALS_QUERY, sql_params, filter_snippets)
+        totals = total_rows[0] if total_rows else {'total_sales_amount': 0, 'total_sales_return': 0, 'total_net_sales': 0}
+
+        return total_count, totals
+
+    def get(self, request):
+        try:
+            params = self._get_common_params(request)
+        except ValidationError as e:
+            return Response(e.detail, status=status.HTTP_400_BAD_REQUEST)
+
+        output = request.query_params.get('export', 'html').lower()
+        if output == 'pdf':
+            return self._export_pdf(request, params)
+        elif output == 'excel':
+            return self._export_excel(request, params)
+        elif output == 'csv':
+            return self._export_csv(request, params)
+        return self._html_view(request, params)
+    
+    def fmt_date(self, value):
+        if value is None:
+            return ""
+        if isinstance(value, (datetime, date)):
+            return value.strftime("%d-%b-%Y")
+        try:
+            dt = datetime.strptime(value, "%Y-%m-%d")
+            return dt.strftime("%d-%b-%Y")
+        except (TypeError, ValueError):
+            return str(value)
+
+    def _html_view(self, request, params):
+        page_val = request.query_params.get('page', '1')
+        try:
+            page = int(page_val)
+        except (ValueError, TypeError):
+            page = 1
+        page_size = int(request.query_params.get('page_size', 50))
+        offset = (page - 1) * page_size
+
+        use_query2 = params['show_instrument_numbers']
+        filter_snippets, extra_params = self._build_filters(params)
+        query_template = self.QUERY2 if use_query2 else self.QUERY1
+
+        sql_params = {'branch_id': params['branch_id'], 'report_date': params['report_date']}
+        sql_params.update(extra_params)
+        sql_params['offset'] = offset
+        sql_params['limit'] = page_size
+
+        paginated_query = query_template + ' OFFSET %(offset)s LIMIT %(limit)s'
+        rows = self._execute_query(paginated_query, sql_params, filter_snippets)
+        total_count, totals = self._get_count_and_totals(params)
+        total_pages = max(1, (total_count + page_size - 1) // page_size)
+
+        return Response({
+            'data': rows,
+            'page': page,
+            'page_size': page_size,
+            'total_count': total_count,
+            'total_pages': total_pages,
+            'totals': totals,
+            'filter_params': {
+                'status': params['status'],
+                'date_mode': params['date_mode'],
+                'date_from': params.get('date_from'),
+                'date_to': params.get('date_to'),
+                'report_date': params['report_date'],
+                'parent_customer': params.get('parent_customer'),
+                'child_customer': params.get('child_customer'),
+                'show_instrument_numbers': params['show_instrument_numbers'],
+                'return_only': params['return_only'],
+            }
+        })
+
+    def _export_pdf(self, request, params):
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        from reportlab.lib.pagesizes import A4, landscape
+        from reportlab.lib import colors
+        from reportlab.lib.styles import getSampleStyleSheet
+        from reportlab.lib.units import mm
+
+        data = self._get_data(params, use_query2=False)
+        total_count, totals = self._get_count_and_totals(params)
+
+        groups = {}                   
+
+        for row in data:
+            pid = row['payment_sl']
+            groups.setdefault(pid, []).append(row)
+
+        buf = io.BytesIO()
+        doc = SimpleDocTemplate(buf, pagesize=landscape(A4), rightMargin=10*mm, leftMargin=10*mm, topMargin=10*mm, bottomMargin=15*mm)
+        styles = getSampleStyleSheet()
+        elements = []
+
+        elements.append(Paragraph('Invoice and Payment Information', styles['Title']))
+        elements.append(Spacer(1, 6*mm))
+
+        filter_text = f"Report Date: {params['report_date']} | Status: {params['status']} | Date Mode: {params['date_mode']}"
+        if params.get('date_from'):
+            filter_text += f" | From: {params['date_from']}"
+        if params.get('date_to'):
+            filter_text += f" | To: {params['date_to']}"
+        if params.get('parent_customer'):
+            filter_text += f" | Parent: {params['parent_customer']}"
+        if params.get('child_customer'):
+            filter_text += f" | Customer: {params['child_customer']}"
+        if params['return_only']:
+            filter_text += ' | Return Only: Yes'
+        elements.append(Paragraph(filter_text, styles['Normal']))
+        elements.append(Spacer(1, 4*mm))
+
+        header_cols = ['Received Date', 'Cheque/Cash Amt', 'Claim Amt', 'Shortage Amt']
+        detail_cols = ['SL No', 'Parent Org', 'Customer', 'Trans Date', 'Grace Days', 'Due Date', 'Sales Amt', 'Sales Return', 'Net Sales', 'Days Overdue']
+
+        grand_sales = grand_return = grand_net = 0
+
+        for pid, rows in groups.items():
+            first = rows[0]
+            if pid is None:
+                hdr_data = [['Unpaid', '', '', '']]
+            else:
+                hdr_data = [[str(first.get('received_date') or ''), str(first.get('cheque_cash_amount') or '0'), str(first.get('claim_amount') or '0'), str(first.get('shortage_amount') or '0')]]
+
+            ht = Table([header_cols] + hdr_data)
+            ht.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#4a90d9')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('FONTSIZE', (0, 0), (-1, -1), 7),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+                ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
+                ('BACKGROUND', (0, 1), (-1, 1), colors.HexColor('#e6f3ff')),
+            ]))
+            elements.append(ht)
+            elements.append(Spacer(1, 2*mm))
+
+            d_rows = [[r['sl_no'], r['parent_organization'] or '', r['customer_name'] or '', str(r['transaction_date']), str(r['grace_days']), str(r.get('due_date', r.get('Due_Date', '')) or ''), str(r['sales_amount']), str(r['sales_return']), str(r['net_sales']), str(r['days_overdue'])] for r in rows]
+            dt = Table([detail_cols] + d_rows)
+            dt.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2c3e50')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('FONTSIZE', (0, 0), (-1, -1), 6),
+                ('GRID', (0, 0), (-1, -1), 0.3, colors.grey),
+                ('ALIGN', (4, 0), (-1, -1), 'RIGHT'),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f8f9fa')]),
+            ]))
+            elements.append(dt)
+            elements.append(Spacer(1, 2*mm))
+
+            gs = sum(r['sales_amount'] for r in rows)
+            gr = sum(r['sales_return'] for r in rows)
+            gn = sum(r['net_sales'] for r in rows)
+            grand_sales += gs
+            grand_return += gr
+            grand_net += gn
+
+            ft = Table([['', '', '', '', 'Group Total:', str(gs), str(gr), str(gn), '']])
+            ft.setStyle(TableStyle([
+                ('FONTSIZE', (0, 0), (-1, -1), 7),
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#d4edda')),
+                ('GRID', (0, 0), (-1, -1), 0.3, colors.grey),
+                ('ALIGN', (4, 0), (6, 0), 'RIGHT'),
+            ]))
+            elements.append(ft)
+            elements.append(Spacer(1, 4*mm))
+
+        elements.append(Spacer(1, 4*mm))
+        elements.append(Paragraph(f'Grand Totals - Sales Amount: {grand_sales}, Sales Return: {grand_return}, Net Sales: {grand_net}', styles['Normal']))
+        doc.build(elements)
+        buf.seek(0)
+
+        response = HttpResponse(buf, content_type='application/pdf')
+        response['Content-Disposition'] = 'attachment; filename="credit_invoice_report.pdf"'
+        return response
+
+    def _export_excel(self, request, params):
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        data = self._get_data(params, use_query2=True)
+        wb = Workbook()
+        ws = wb.active
+        ws.title = 'Credit Invoice Report'
+
+        header_font = Font(name='Calibri', bold=True, size=11, color='FFFFFF')
+        header_fill = PatternFill(start_color='2F5496', end_color='2F5496', fill_type='solid')
+        header_alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+
+        title_font = Font(name='Calibri', bold=True, size=14, color='2F5496')
+        label_font = Font(name='Calibri', bold=True, size=10)
+        value_font = Font(name='Calibri', size=10)
+
+        thin_border = Border(
+            left=Side(style='thin', color='B0B0B0'),
+            right=Side(style='thin', color='B0B0B0'),
+            top=Side(style='thin', color='B0B0B0'),
+            bottom=Side(style='thin', color='B0B0B0'),
+        )
+        date_alignment = Alignment(horizontal='center', vertical='center')
+        number_alignment = Alignment(horizontal='right', vertical='center')
+        text_alignment = Alignment(horizontal='left', vertical='center', wrap_text=True)
+
+        col_widths = {
+            1: 8, 2: 28, 3: 28, 4: 16, 5: 12, 6: 16, 7: 16,
+            8: 16, 9: 16, 10: 16, 11: 30, 12: 18, 13: 30, 14: 18,
+            15: 16, 16: 14, 17: 14,
+        }
+
+        ws.merge_cells('A1:Q1')
+        title_cell = ws['A1']
+        title_cell.value = 'Credit Invoice Report'
+        title_cell.font = title_font
+        title_cell.alignment = Alignment(horizontal='left', vertical='center')
+        ws.row_dimensions[1].height = 30
+
+        parent_customer_alias = params.get('parent_customer')
+        child_customer_alias = params.get('child_customer')
+        parent_customer_name = 'All'
+        child_customer_name = 'All'
+        if parent_customer_alias:
+            try:
+                parent_customer_name = Customer.objects.values_list('name', flat=True).get(alias_id=parent_customer_alias)
+            except Customer.DoesNotExist:
+                pass
+        if child_customer_alias:
+            try:
+                child_customer_name = Customer.objects.values_list('name', flat=True).get(alias_id=child_customer_alias)
+            except Customer.DoesNotExist:
+                pass
+
+        date_from = params.get('date_from')
+        date_to = params.get('date_to')
+        date_from_str = self.fmt_date(date_from) if date_from else 'N/A'
+        date_to_str = self.fmt_date(date_to) if date_to else 'N/A'
+
+        filter_info = [
+            ('Report Date', params['report_date']),
+            ('Status', params['status']),
+            ('Date Mode', params['date_mode']),
+            ('Date From', date_from_str),
+            ('Date To', date_to_str),
+            ('Parent Customer', parent_customer_name),
+            ('Child Customer', child_customer_name),
+            ('Return Only', 'Yes' if params['return_only'] else 'No'),
+        ]
+        for i, (label, value) in enumerate(filter_info):
+            row_num = 2 + i
+            ws.cell(row=row_num, column=1, value=label).font = label_font
+            ws.merge_cells(start_row=row_num, start_column=2, end_row=row_num, end_column=4)
+            val_cell = ws.cell(row=row_num, column=2, value=value)
+            val_cell.font = value_font
+            val_cell.alignment = Alignment(horizontal='left', vertical='center')
+
+        ws.append([])
+
+        show_instruments = params['show_instrument_numbers']
+        if show_instruments:
+            cols = ['SL No', 'Parent Organization', 'Customer Name', 'Transaction Date', 'Grace Days', 'Due Date', 'Received Date', 'Sales Amount', 'Sales Return', 'Net Sales', 'Cheque Numbers', 'Cheque/Cash Amount', 'Claim Numbers', 'Claim Amount', 'Shortage Amount', 'Days Overdue', 'Payment SL']
+        else:
+            cols = ['SL No', 'Parent Organization', 'Customer Name', 'Transaction Date', 'Grace Days', 'Due Date', 'Received Date', 'Sales Amount', 'Sales Return', 'Net Sales', 'Cheque/Cash Amount', 'Claim Amount', 'Shortage Amount', 'Days Overdue', 'Payment SL']
+
+        header_row = ws.max_row + 1
+        for col_idx, col_name in enumerate(cols, 1):
+            cell = ws.cell(row=header_row, column=col_idx, value=col_name)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = header_alignment
+            cell.border = thin_border
+        ws.row_dimensions[header_row].height = 28
+
+        for row in data:
+            trans_date = self.fmt_date(row.get("transaction_date"))
+            recv_date = self.fmt_date(row.get("received_date"))
+            due_date = self.fmt_date(row.get("Due_Date") or row.get("due_date"))
+            data_row_num = ws.max_row + 1
+
+            common_values = [
+                (1, int(row.get("sl_no", 0)), number_alignment),
+                (2, row.get("parent_organization", ""), text_alignment),
+                (3, row.get("customer_name", ""), text_alignment),
+                (4, trans_date, date_alignment),
+                (5, int(row.get("grace_days", 0)), number_alignment),
+                (6, due_date, date_alignment),
+                (7, recv_date, date_alignment),
+            ]
+
+            if show_instruments:
+                values = common_values + [
+                    (8, float(row.get("sales_amount", 0)), number_alignment),
+                    (9, float(row.get("sales_return", 0)), number_alignment),
+                    (10, float(row.get("net_sales", 0)), number_alignment),
+                    (11, row.get("cheque_numbers", ""), text_alignment),
+                    (12, float(row.get("cheque_cash_amount", 0) or 0), number_alignment),
+                    (13, row.get("claim_numbers", ""), text_alignment),
+                    (14, float(row.get("claim_amount", 0) or 0), number_alignment),
+                    (15, float(row.get("shortage_amount", 0) or 0), number_alignment),
+                    (16, int(row.get("days_overdue", 0)), number_alignment),
+                    (17, int(row.get('payment_sl', 0)), number_alignment),
+                ]
+            else:
+                values = common_values + [
+                    (8, float(row.get("sales_amount", 0)), number_alignment),
+                    (9, float(row.get("sales_return", 0)), number_alignment),
+                    (10, float(row.get("net_sales", 0)), number_alignment),
+                    (11, float(row.get("cheque_cash_amount", 0) or 0), number_alignment),
+                    (12, float(row.get("claim_amount", 0) or 0), number_alignment),
+                    (13, float(row.get("shortage_amount", 0) or 0), number_alignment),
+                    (14, int(row.get("days_overdue", 0)), number_alignment),
+                    (15, int(row.get('payment_sl', 0)), number_alignment),
+                ]
+
+            for col_idx, val, align in values:
+                cell = ws.cell(row=data_row_num, column=col_idx, value=val)
+                cell.font = value_font
+                cell.alignment = align
+                cell.border = thin_border
+
+        total_cols = len(cols)
+        for col_idx in range(1, total_cols + 1):
+            ws.column_dimensions[get_column_letter(col_idx)].width = col_widths.get(col_idx, 14)
+
+        ws.freeze_panes = f'A{header_row + 1}'
+
+        last_col_letter = get_column_letter(total_cols)
+        ws.auto_filter.ref = f'A{header_row}:{last_col_letter}{ws.max_row}'
+
+        response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        wb.save(response)
+        response['Content-Disposition'] = 'attachment; filename="credit_invoice_report.xlsx"'
+        return response
+
+    def _export_csv(self, request, params):
+        import csv
+        data = self._get_data(params, use_query2=True)
+
+        def csv_generator():
+            yield '# Credit Invoice Report\n'
+            yield f'# Report Date: {params["report_date"]}\n'
+            yield f'# Status: {params["status"]}\n'
+            yield f'# Date Mode: {params["date_mode"]}\n'
+            yield f'# Date From: {params.get("date_from", "N/A")}\n'
+            yield f'# Date To: {params.get("date_to", "N/A")}\n'
+            yield f'# Parent Customer: {params.get("parent_customer", "All")}\n'
+            yield f'# Child Customer: {params.get("child_customer", "All")}\n'
+            yield f'# Return Only: {"Yes" if params["return_only"] else "No"}\n'
+            yield '\n'
+
+            if params['show_instrument_numbers']:
+                cols = ['Invoice No', 'Parent Organization', 'Customer Name', 'Transaction Date', 'Grace Days', 'Due Date', 'Received Date', 'Sales Amount', 'Sales Return', 'Net Sales', 'Cheque Numbers', 'Cheque/Cash Amount', 'Claim Numbers', 'Claim Amount', 'Shortage Amount', 'Payment SL', 'Days Overdue']
+            else:
+                cols = ['Invoice No', 'Parent Organization', 'Customer Name', 'Transaction Date', 'Grace Days', 'Due Date', 'Received Date', 'Sales Amount', 'Sales Return', 'Net Sales', 'Cheque/Cash Amount', 'Claim Amount', 'Shortage Amount', 'Payment SL', 'Days Overdue']
+
+            buf = io.StringIO()
+            writer = csv.writer(buf)
+            writer.writerow(cols)
+            yield buf.getvalue()
+            buf.seek(0)
+            buf.truncate(0)
+
+            for row in data:
+                if params['show_instrument_numbers']:
+                    writer.writerow([row.get("sl_no") or "", row.get("parent_organization") or "", row.get("customer_name") or "", row.get("transaction_date") or "", row.get("grace_days") or 0, row.get("Due_Date") or row.get("due_date") or "", row.get("received_date") or "", row.get("sales_amount") or 0, row.get("sales_return") or 0, row.get("net_sales") or 0, row.get("cheque_numbers") or "", row.get("cheque_cash_amount") or 0, row.get("claim_numbers") or "", row.get("claim_amount") or 0, row.get("shortage_amount") or 0, str(row.get('payment_sl') or ''), row.get("days_overdue") or 0])
+                else:
+                    writer.writerow([row.get("sl_no") or "", row.get("parent_organization") or "", row.get("customer_name") or "", row.get("transaction_date") or "", row.get("grace_days") or 0, row.get("Due_Date") or row.get("due_date") or "", row.get("received_date") or "", row.get("sales_amount") or 0, row.get("sales_return") or 0, row.get("net_sales") or 0, row.get("cheque_cash_amount") or 0, row.get("claim_amount") or 0, row.get("shortage_amount") or 0, str(row.get('payment_sl') or ''), row.get("days_overdue") or 0])
+                yield buf.getvalue()
+                buf.seek(0)
+                buf.truncate(0)
+
+        response = StreamingHttpResponse(csv_generator(), content_type='text/csv')
+        response['Content-Disposition'] = 'attachment; filename="credit_invoice_report.csv"'
+        return response

@@ -1,4 +1,5 @@
 Hardcoded Value: 
   1. instrument_type.serial_no =3, it should be replaced with an enum. Value of serial_no meaning 1. Cheque 2. Cash 3. Claim
-  2. Cash and bank type instruments should be cash equivalent 
-  3. 
+  2. Cash and bank type instruments should be cash equivalent    
+  3. Credit Invoice report : Excel and CSV now always use Query 2, and the FIRST_VALUE window function ensures all rows in a payment group get the instrument numbers and amounts without NULLs. to filter report need group data or payment data side by side. query1 for html report
+

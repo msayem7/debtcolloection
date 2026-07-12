@@ -30,6 +30,8 @@ services:
       DJANGO_DB_USER: ${POSTGRES_USER}
       DJANGO_DB_PASSWORD: ${POSTGRES_PASSWORD}
       DJANGO_DB_PORT: "5432"
+      PYTHONUNBUFFERED: 1
+      DEBUG: 1
     volumes:
       - static_volume:/app/staticfiles
     depends_on:
