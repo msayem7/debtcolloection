@@ -30,7 +30,7 @@
             </select>
           </div>
           <div class="col-md-3">
-            <label class="form-label">Child Customer</label>
+            <label class="form-label">Customer</label>
             <select v-model="filters.childCustomer" class="form-select" :disabled="!filters.parentCustomer">
               <option value="">All Customers</option>
               <option v-for="c in childCustomers" :key="c.alias_id" :value="c.alias_id">
@@ -95,7 +95,6 @@
           <div class="col-md-12 d-flex justify-content-between align-items-end">
             <div>
               <button class="btn btn-primary me-2" @click="loadReport()" :disabled="loading">
-                <span v-if="loading" class="spinner-border spinner-border-sm me-1"></span>
                 Generate Report
               </button>
             </div>
@@ -177,19 +176,23 @@
           </table>
         </div>
 
-        <!-- Standard Pagination -->
-        <div v-if="hasData && !showInteractive && totalPages > 1" class="d-flex justify-content-between align-items-center mt-3">
-          <small>Page {{ currentPage }} of {{ totalPages }} ({{ totalCount }} records)</small>
-          <div>
-            <button class="btn btn-sm btn-outline-primary me-1" :disabled="currentPage <= 1" @click="goToPage(currentPage - 1)">
+<!-- Standard Pagination -->
+        <div v-if="hasData && !showInteractive" class="d-flex justify-content-between align-items-center mt-3">
+          <div class="d-flex align-items-center gap-2">
+            <small class="me-2">Page {{ currentPage }} of {{ totalPages }} ({{ totalCount }} records)</small>
+            <label class="form-label mb-0 me-1" style="font-size:0.85rem;">Per page:</label>
+            <input type="number" v-model.number="pageSize" class="form-control form-control-sm" style="width:80px;" min="1" @change="onPageSizeChange" />
+          </div>
+          <div class="d-flex align-items-center gap-2">
+            <button class="btn btn-sm btn-outline-primary" :disabled="currentPage <= 1" @click="goToPage(currentPage - 1)">
               &laquo; Previous
             </button>
+            <input type="number" v-model.number="pageInput" class="form-control form-control-sm" style="width:70px;" min="1" :max="totalPages" @keyup.enter="goToPageInput" placeholder="Page" />
             <button class="btn btn-sm btn-outline-primary" :disabled="currentPage >= totalPages" @click="goToPage(currentPage + 1)">
               Next &raquo;
             </button>
           </div>
         </div>
-
         <!-- Interactive Report - Split Pane Layout -->
         <div v-if="showInteractive && interactiveData.length > 0" class="split-pane-container mt-3">
           <!-- Left Pane: Payment Information -->
@@ -324,6 +327,8 @@ const totals = ref({ total_sales_amount: 0, total_sales_return: 0, total_net_sal
 const currentPage = ref(1)
 const totalPages = ref(1)
 const totalCount = ref(0)
+const pageSize = ref(25)
+const pageInput = ref('')
 const parentOrganizations = ref([])
 const childCustomers = ref([])
 
@@ -533,7 +538,7 @@ const loadReport = async (page = 1) => {
       show_instrument_numbers: filters.showInstrumentNumbers ? 'true' : 'false',
       return_only: filters.returnOnly ? 'true' : 'false',
       page: isInteractive ? 1 : currentPage.value,
-      page_size: isInteractive ? 100000 : 50,
+      page_size: isInteractive ? 1000 : pageSize.value,
     }
 
     if (filters.parentCustomer) params.parent_customer = filters.parentCustomer
@@ -567,6 +572,20 @@ const loadReport = async (page = 1) => {
 const goToPage = (page) => {
   if (page >= 1 && page <= totalPages.value) {
     loadReport(page)
+  }
+}
+
+const onPageSizeChange = () => {
+  currentPage.value = 1
+  pageInput.value = ''
+  loadReport(1)
+}
+
+const goToPageInput = () => {
+  const p = parseInt(pageInput.value, 10)
+  if (!isNaN(p) && p >= 1 && p <= totalPages.value) {
+    goToPage(p)
+    pageInput.value = ''
   }
 }
 
@@ -903,5 +922,17 @@ watch(() => branchStore.selectedBranch, () => {
 .sort-indicator {
   font-size: 0.7rem;
   margin-left: 2px;
+}
+</style>
+
+<style>
+/* Hide native number input spinners for page/pageSize inputs (unscoped to reach pseudo-elements) */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
 }
 </style>
