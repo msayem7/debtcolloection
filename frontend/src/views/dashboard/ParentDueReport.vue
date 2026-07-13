@@ -272,8 +272,8 @@ const exportToExcel = async () => {
       params.branch = branchStore.selectedBranch
     }
 
-    const response = await axios.get('/v1/chq/parent-customer-due-report/export/', {
-      params,
+    const response = await axios.get('/v1/chq/parent-customer-due-report/', {
+      params: { ...params, export: 'excel' },
       responseType: 'blob'
     })
 

@@ -29,4 +29,5 @@ Feature:
 09. While doing a particular payment editing, typing perform very very slowly. like takes 5 seconds to refresh. thats entry is 23-may-2026, customer ACI logistics, 57 invoices against this payment. but other entries are not that much slow.
 
 10. Check Consistency page. It will run once a day before run invoices. It forcing user and keep a log. 
-12. 
+
+12. Negetive due found. but dashboard did not consider the nagetive due. Negetive due should be hilighted in red in dashboard and all reports

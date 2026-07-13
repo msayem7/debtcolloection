@@ -26,4 +26,12 @@ X7. In Payment Entry Page, without selecing any customer,
 9. {"error":"ID number 5042801 already exists in this branch"} --- If payment id already exists show a user friendly message. 
     and for any generic error I want to see the original error below message as note. 
 
-10. 
+10. Show Instrument Number Parameter is not export to excel
+11. Remove old files: 
+        1. views/reports/InvoiceChequeRep.vue
+        2. views/reports/CustomerStatementReport.vue
+        3. views/SalesDetailReport.vue
+12. Negetive due found. but dashboard did not consider the nagetive due. Negetive due should be hilighted in red in dashboard and all reports.
+    When calculate if negative due found that means return amount diducted while calculating due amount in dashboard but not all only if total sales - total return is less for a shop
+    
+

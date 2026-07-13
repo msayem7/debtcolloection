@@ -738,14 +738,14 @@ class ClaimViewSet(viewsets.ModelViewSet):
 class ParentCustomerDueReport(APIView):
     def get(self, request):
         report_date_str = request.query_params.get('date')
-        branch_alias_id = request.query_params.get('branch')  # New branch filter
+        branch_alias_id = request.query_params.get('branch')
 
         if branch_alias_id is None:
             return Response(
                 {"error": "Banch Id is mandatory"},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         try:
             report_date = timezone.datetime.strptime(report_date_str, '%Y-%m-%d').date() if report_date_str else timezone.now().date()
         except ValueError:
@@ -753,25 +753,25 @@ class ParentCustomerDueReport(APIView):
                 {"error": "Invalid date format. Use YYYY-MM-DD"},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
-        
+
         customer_qs = Customer.objects.all()
         invoice_qs = CreditInvoice.objects.all()
-        
+
         # Apply branch filter if provided
         if branch_alias_id:
             customer_qs = customer_qs.filter(branch__alias_id=branch_alias_id)
             invoice_qs = invoice_qs.filter(branch__alias_id=branch_alias_id)
-        else :
+        else:
             return Response(
                 {"error": "Branch is mandatory"},
                 status=status.HTTP_400_BAD_REQUEST
             )
+
         # Query 1: Get all parent-child relationships with alias_id
         customer_hierarchy = Customer.objects.filter(
             ( Q(is_parent=True) | Q(parent__isnull=False))
         ).values('alias_id', 'name', 'is_parent', 'parent__alias_id', 'parent__name')
-        
+
         # Query 2: Get all due invoice amounts grouped by customer
         due_amounts = CreditInvoice.objects.filter(
             customer__parent__isnull=False,  # Only child customers
@@ -790,16 +790,21 @@ class ParentCustomerDueReport(APIView):
             matured_due=Sum('sales_amount', filter=Q(is_matured=1)) - Sum('sales_return', filter=Q(is_matured=1)),
             immature_due=Sum('sales_amount', filter=Q(is_matured=0))- Sum('sales_return', filter=Q(is_matured=0))
         )
-        
-        # Process in Python
+
+        # Check if export is requested
+        output = request.query_params.get('export', 'html').lower()
+        if output == 'excel':
+            return self._export_excel(request, report_date, branch_alias_id, customer_hierarchy, due_amounts)
+
+        # Process in Python for JSON response
         parents = {c['alias_id']: c for c in customer_hierarchy if c['is_parent']}
         children = {c['alias_id']: c for c in customer_hierarchy if not c['is_parent']}
-        
+
         report_data = []
         grand_total_matured = 0
         grand_total_immature = 0
         grand_total_due = 0
-        
+
         for parent in parents.values():
             parent_entry = {
                 'alias_id': parent['alias_id'],
@@ -809,18 +814,18 @@ class ParentCustomerDueReport(APIView):
                 'total_due': 0,
                 'children': []
             }
-            
+
             for child in children.values():
                 if child['parent__alias_id'] == parent['alias_id']:
                     amounts = next(
-                        (a for a in due_amounts 
-                         if a['customer__alias_id'] == child['alias_id']), 
+                        (a for a in due_amounts
+                         if a['customer__alias_id'] == child['alias_id']),
                         {}
                     )
                     child_entry = {
                         'alias_id': child['alias_id'],
                         'name': child['name'],
-                        'matured_due': amounts.get('matured_due', Decimal(0)) or Decimal(0), 
+                        'matured_due': amounts.get('matured_due', Decimal(0)) or Decimal(0),
                         'immature_due': amounts.get('immature_due', Decimal(0)) or Decimal(0)
                     }
                     child_entry['total_due'] = child_entry['matured_due'] + child_entry['immature_due']
@@ -828,13 +833,13 @@ class ParentCustomerDueReport(APIView):
                     parent_entry['matured_due'] += child_entry['matured_due']
                     parent_entry['immature_due'] += child_entry['immature_due']
                     parent_entry['total_due'] += child_entry['total_due']
-                    
+
                     grand_total_matured += child_entry['matured_due']
                     grand_total_immature += child_entry['immature_due']
                     grand_total_due += child_entry['total_due']
-            
+
             report_data.append(parent_entry)
-        
+
         return Response({
             'report_date': report_date.strftime('%Y-%m-%d'),
             'data': report_data,
@@ -844,6 +849,178 @@ class ParentCustomerDueReport(APIView):
                 'total_due': grand_total_due
             }
         })
+
+    def _export_excel(self, request, report_date, branch_alias_id, customer_hierarchy, due_amounts):
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+
+        # Process data
+        parents = {c['alias_id']: c for c in customer_hierarchy if c['is_parent']}
+        children = {c['alias_id']: c for c in customer_hierarchy if not c['is_parent']}
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = 'Customer Due Report'
+
+        header_font = Font(name='Calibri', bold=True, size=11, color='FFFFFF')
+        header_fill = PatternFill(start_color='2F5496', end_color='2F5496', fill_type='solid')
+        header_alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+
+        title_font = Font(name='Calibri', bold=True, size=14, color='2F5496')
+        label_font = Font(name='Calibri', bold=True, size=10)
+        value_font = Font(name='Calibri', size=10)
+
+        thin_border = Border(
+            left=Side(style='thin', color='B0B0B0'),
+            right=Side(style='thin', color='B0B0B0'),
+            top=Side(style='thin', color='B0B0B0'),
+            bottom=Side(style='thin', color='B0B0B0'),
+        )
+        number_alignment = Alignment(horizontal='right', vertical='center')
+        text_alignment = Alignment(horizontal='left', vertical='center', wrap_text=True)
+
+        # Title
+        ws.merge_cells('A1:D1')
+        title_cell = ws['A1']
+        title_cell.value = 'Parent Customer Due Report'
+        title_cell.font = title_font
+        title_cell.alignment = Alignment(horizontal='left', vertical='center')
+        ws.row_dimensions[1].height = 30
+
+        # Filter info
+        try:
+            branch_name = Branch.objects.values_list('name', flat=True).get(
+                alias_id=branch_alias_id
+            )
+        except Branch.DoesNotExist:
+            branch_name = branch_alias_id
+
+        filter_info = [
+            ('Report Date', report_date.strftime('%Y-%m-%d')),
+            ('Branch', branch_name),
+        ]
+        for i, (label, value) in enumerate(filter_info):
+            row_num = 2 + i
+            ws.cell(row=row_num, column=1, value=label).font = label_font
+            ws.merge_cells(start_row=row_num, start_column=2, end_row=row_num, end_column=4)
+            val_cell = ws.cell(row=row_num, column=2, value=value)
+            val_cell.font = value_font
+            val_cell.alignment = Alignment(horizontal='left', vertical='center')
+
+        ws.append([])
+
+        # Column headers
+        cols = ['Customer', 'Matured', 'Immature', 'Total']
+        header_row = ws.max_row + 1
+        for col_idx, col_name in enumerate(cols, 1):
+            cell = ws.cell(row=header_row, column=col_idx, value=col_name)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = header_alignment
+            cell.border = thin_border
+        ws.row_dimensions[header_row].height = 28
+
+        # Data rows
+        data_start_row = header_row + 1
+        row_num = data_start_row
+
+        for parent in parents.values():
+            # Parent row
+            parent_matured = 0
+            parent_immature = 0
+            parent_total = 0
+            child_rows = []
+
+            for child in children.values():
+                if child['parent__alias_id'] == parent['alias_id']:
+                    amounts = next(
+                        (a for a in due_amounts
+                         if a['customer__alias_id'] == child['alias_id']),
+                        {}
+                    )
+                    matured = float(amounts.get('matured_due', 0) or 0)
+                    immature = float(amounts.get('immature_due', 0) or 0)
+                    total = matured + immature
+
+                    if total > 0:
+                        child_rows.append((child['name'], matured, immature, total))
+                        parent_matured += matured
+                        parent_immature += immature
+                        parent_total += total
+
+            if parent_total > 0 or len(child_rows) > 0:
+                # Write parent row
+                cells_data = [
+                    (1, parent['name'], text_alignment, True),
+                    (2, parent_matured, number_alignment, True),
+                    (3, parent_immature, number_alignment, True),
+                    (4, parent_total, number_alignment, True),
+                ]
+                for col_idx, val, align, is_bold in cells_data:
+                    cell = ws.cell(row=row_num, column=col_idx, value=val)
+                    cell.font = Font(name='Calibri', bold=True, size=10)
+                    cell.alignment = align
+                    cell.border = thin_border
+                row_num += 1
+
+                # Write child rows
+                for child_name, matured, immature, total in child_rows:
+                    child_cells = [
+                        (1, f'  {child_name}', text_alignment, False),
+                        (2, matured, number_alignment, False),
+                        (3, immature, number_alignment, False),
+                        (4, total, number_alignment, False),
+                    ]
+                    for col_idx, val, align, _ in child_cells:
+                        cell = ws.cell(row=row_num, column=col_idx, value=val)
+                        cell.font = value_font
+                        cell.alignment = align
+                        cell.border = thin_border
+                    row_num += 1
+
+        # Grand total row
+        grand_matured = 0
+        grand_immature = 0
+        grand_total = 0
+        for parent in parents.values():
+            for child in children.values():
+                if child['parent__alias_id'] == parent['alias_id']:
+                    amounts = next(
+                        (a for a in due_amounts
+                         if a['customer__alias_id'] == child['alias_id']),
+                        {}
+                    )
+                    grand_matured += float(amounts.get('matured_due', 0) or 0)
+                    grand_immature += float(amounts.get('immature_due', 0) or 0)
+                    grand_total += float(amounts.get('matured_due', 0) or 0) + float(amounts.get('immature_due', 0) or 0)
+
+        grand_total_cells = [
+            (1, 'Grand Total', text_alignment, True),
+            (2, grand_matured, number_alignment, True),
+            (3, grand_immature, number_alignment, True),
+            (4, grand_total, number_alignment, True),
+        ]
+        for col_idx, val, align, _ in grand_total_cells:
+            cell = ws.cell(row=row_num, column=col_idx, value=val)
+            cell.font = Font(name='Calibri', bold=True, size=10, color='FFFFFF')
+            cell.fill = PatternFill(start_color='2F5496', end_color='2F5496', fill_type='solid')
+            cell.alignment = align
+            cell.border = thin_border
+
+        # Column widths
+        col_widths = {1: 40, 2: 16, 3: 16, 4: 16}
+        for col_idx in range(1, 5):
+            ws.column_dimensions[get_column_letter(col_idx)].width = col_widths.get(col_idx, 14)
+
+        ws.freeze_panes = f'A{header_row + 1}'
+
+        response = HttpResponse(
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        wb.save(response)
+        response['Content-Disposition'] = 'attachment; filename="parent_customer_due_report.xlsx"'
+        return response
 # ==================== Credit Invoice Report Module ====================
 
 class CreditInvoiceReportView(APIView):
@@ -1498,4 +1675,509 @@ class CreditInvoiceReportView(APIView):
 
         response = StreamingHttpResponse(csv_generator(), content_type='text/csv')
         response['Content-Disposition'] = 'attachment; filename="credit_invoice_report.csv"'
+        return response
+
+
+# ==================== Received and Claim Report Module ====================
+
+class ReceivedClaimReportView(APIView):
+    '''
+    Received and Claim Report with filtering, pagination, PDF, Excel exports.
+    Endpoint: GET /v1/chq/reports/received-claim/
+    '''
+    permission_classes = [IsAuthenticated]
+
+    RECEIVE_QUERY = '''
+        SELECT
+            ROW_NUMBER() OVER (ORDER BY p.received_date, pd.id) AS sl_no,
+            p.alias_id AS payment_id,
+            p.received_date,
+            c.name AS organization_name,
+            pi.instrument_name,
+            pd.id_number AS instrument_number,
+            pd.amount,
+            pd.detail AS remarks
+        FROM payment_details pd
+        JOIN payment p ON p.id = pd.payment_id
+        JOIN customer c ON c.id = p.customer_id
+        LEFT JOIN customer pc ON pc.id = c.parent_id AND pc.is_parent = TRUE
+        JOIN payment_instrument pi ON pi.id = pd.payment_instrument_id
+        WHERE p.branch_id = %(branch_id)s
+        {parent_filter}
+        {instrument_filter}
+        {date_filter}
+        {comments_filter}
+        ORDER BY p.received_date, pd.id
+    '''
+
+    CLAIM_QUERY = '''
+        SELECT
+            ROW_NUMBER() OVER (ORDER BY p.received_date, cl.id) AS sl_no,
+            cl.alias_id AS claim_id,
+            p.received_date AS claim_date,
+            c.name AS organization_name,
+            pi.instrument_name,
+            pd.id_number AS instrument_number,
+            pd.amount,
+            cl.refund_amount,
+            cl.refund_date,
+            (pd.amount - COALESCE(cl.refund_amount, 0)) AS remaining_amount,
+            cl.remarks
+        FROM claim cl
+        JOIN payment_details pd ON pd.id = cl.payment_details_id
+        JOIN payment p ON p.id = pd.payment_id
+        JOIN customer c ON c.id = p.customer_id
+        LEFT JOIN customer pc ON pc.id = c.parent_id AND pc.is_parent = TRUE
+        JOIN payment_instrument pi ON pi.id = pd.payment_instrument_id
+        WHERE p.branch_id = %(branch_id)s
+        {parent_filter}
+        {instrument_filter}
+        {date_filter}
+        {refund_filter}
+        {comments_filter}
+        ORDER BY p.received_date, cl.id
+    '''
+
+    RECEIVE_COUNT_QUERY = '''
+        SELECT COUNT(*) AS total
+        FROM payment_details pd
+        JOIN payment p ON p.id = pd.payment_id
+        JOIN customer c ON c.id = p.customer_id
+        LEFT JOIN customer pc ON pc.id = c.parent_id AND pc.is_parent = TRUE
+        JOIN payment_instrument pi ON pi.id = pd.payment_instrument_id
+        WHERE p.branch_id = %(branch_id)s
+        {parent_filter}
+        {instrument_filter}
+        {date_filter}
+        {comments_filter}
+    '''
+
+    CLAIM_COUNT_QUERY = '''
+        SELECT COUNT(*) AS total
+        FROM claim cl
+        JOIN payment_details pd ON pd.id = cl.payment_details_id
+        JOIN payment p ON p.id = pd.payment_id
+        JOIN customer c ON c.id = p.customer_id
+        LEFT JOIN customer pc ON pc.id = c.parent_id AND pc.is_parent = TRUE
+        JOIN payment_instrument pi ON pi.id = pd.payment_instrument_id
+        WHERE p.branch_id = %(branch_id)s
+        {parent_filter}
+        {instrument_filter}
+        {date_filter}
+        {refund_filter}
+        {comments_filter}
+    '''
+
+    RECEIVE_TOTALS_QUERY = '''
+        SELECT
+            COALESCE(SUM(pd.amount), 0) AS total_amount
+        FROM payment_details pd
+        JOIN payment p ON p.id = pd.payment_id
+        JOIN customer c ON c.id = p.customer_id
+        LEFT JOIN customer pc ON pc.id = c.parent_id AND pc.is_parent = TRUE
+        JOIN payment_instrument pi ON pi.id = pd.payment_instrument_id
+        WHERE p.branch_id = %(branch_id)s
+        {parent_filter}
+        {instrument_filter}
+        {date_filter}
+        {comments_filter}
+    '''
+
+    CLAIM_TOTALS_QUERY = '''
+        SELECT
+            COALESCE(SUM(pd.amount), 0) AS total_amount,
+            COALESCE(SUM(cl.refund_amount), 0) AS total_refund,
+            COALESCE(SUM(pd.amount - COALESCE(cl.refund_amount, 0)), 0) AS total_remaining
+        FROM claim cl
+        JOIN payment_details pd ON pd.id = cl.payment_details_id
+        JOIN payment p ON p.id = pd.payment_id
+        JOIN customer c ON c.id = p.customer_id
+        LEFT JOIN customer pc ON pc.id = c.parent_id AND pc.is_parent = TRUE
+        JOIN payment_instrument pi ON pi.id = pd.payment_instrument_id
+        WHERE p.branch_id = %(branch_id)s
+        {parent_filter}
+        {instrument_filter}
+        {date_filter}
+        {refund_filter}
+        {comments_filter}
+    '''
+
+    def _build_filters(self, params, report_type):
+        snippets = {
+            'parent_filter': '',
+            'instrument_filter': '',
+            'date_filter': '',
+            'refund_filter': '',
+            'comments_filter': '',
+        }
+        extra_params = {}
+
+        parent_customer = params.get('parent_customer')
+        if parent_customer:
+            snippets['parent_filter'] = " AND c.alias_id = %(parent_customer)s"
+            extra_params['parent_customer'] = parent_customer
+
+        instrument_ids = params.get('instrument_ids')
+        if instrument_ids:
+            id_list = [x.strip() for x in instrument_ids.split(',') if x.strip()]
+            if id_list:
+                placeholders = ','.join([f'%(inst_{i})s' for i in range(len(id_list))])
+                snippets['instrument_filter'] = f" AND pi.id IN ({placeholders})"
+                for i, val in enumerate(id_list):
+                    extra_params[f'inst_{i}'] = val
+
+        if report_type == 'receive':
+            date_from = params.get('date_from')
+            date_to = params.get('date_to')
+            if date_from and date_to:
+                snippets['date_filter'] = " AND p.received_date BETWEEN %(date_from)s::date AND %(date_to)s::date"
+                extra_params['date_from'] = date_from
+                extra_params['date_to'] = date_to
+            elif date_from:
+                snippets['date_filter'] = " AND p.received_date >= %(date_from)s::date"
+                extra_params['date_from'] = date_from
+            elif date_to:
+                snippets['date_filter'] = " AND p.received_date <= %(date_to)s::date"
+                extra_params['date_to'] = date_to
+
+            if params.get('has_comments') in (True, 'true', 'True', 1, '1'):
+                snippets['comments_filter'] = " AND pd.detail IS NOT NULL AND pd.detail != ''"
+
+        elif report_type == 'claim':
+            date_mode = params.get('date_mode', 'received_date')
+            date_from = params.get('date_from')
+            date_to = params.get('date_to')
+
+            date_col = 'cl.refund_date' if date_mode == 'refund_date' else 'p.received_date'
+            if date_from and date_to:
+                snippets['date_filter'] = f" AND {date_col} BETWEEN %(date_from)s::date AND %(date_to)s::date"
+                extra_params['date_from'] = date_from
+                extra_params['date_to'] = date_to
+            elif date_from:
+                snippets['date_filter'] = f" AND {date_col} >= %(date_from)s::date"
+                extra_params['date_from'] = date_from
+            elif date_to:
+                snippets['date_filter'] = f" AND {date_col} <= %(date_to)s::date"
+                extra_params['date_to'] = date_to
+
+            refund_status = params.get('refund_status', 'all')
+            if refund_status == 'refunded':
+                snippets['refund_filter'] = " AND cl.refund_amount > 0"
+            elif refund_status == 'pending':
+                snippets['refund_filter'] = " AND (cl.refund_amount IS NULL OR cl.refund_amount = 0)"
+
+            if params.get('has_comments') in (True, 'true', 'True', 1, '1'):
+                snippets['comments_filter'] = " AND cl.remarks IS NOT NULL AND cl.remarks != ''"
+
+        return snippets, extra_params
+
+    def _get_common_params(self, request):
+        branch = request.query_params.get('branch')
+        if not branch:
+            raise ValidationError({'branch': 'Branch is required.'})
+
+        branch_obj = get_object_or_404(Branch, alias_id=branch)
+
+        return {
+            'branch_id': branch_obj.id,
+            'report_type': request.query_params.get('report_type', 'receive'),
+            'parent_customer': request.query_params.get('parent_customer'),
+            'instrument_ids': request.query_params.get('instrument_ids'),
+            'date_from': request.query_params.get('date_from'),
+            'date_to': request.query_params.get('date_to'),
+            'date_mode': request.query_params.get('date_mode', 'received_date'),
+            'refund_status': request.query_params.get('refund_status', 'all'),
+            'has_comments': request.query_params.get('has_comments', 'false').lower() == 'true',
+        }
+
+    def _execute_query(self, sql_template, sql_params, filter_snippets):
+        sql = sql_template.format(**filter_snippets)
+        with connection.cursor() as cursor:
+            cursor.execute(sql, sql_params)
+            columns = [col[0] for col in cursor.description]
+            rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
+        return rows
+
+    def _get_data(self, params):
+        filter_snippets, extra_params = self._build_filters(params, params['report_type'])
+        query_template = self.RECEIVE_QUERY if params['report_type'] == 'receive' else self.CLAIM_QUERY
+        sql_params = {'branch_id': params['branch_id']}
+        sql_params.update(extra_params)
+        return self._execute_query(query_template, sql_params, filter_snippets)
+
+    def _get_count_and_totals(self, params):
+        filter_snippets, extra_params = self._build_filters(params, params['report_type'])
+        is_receive = params['report_type'] == 'receive'
+        count_query = self.RECEIVE_COUNT_QUERY if is_receive else self.CLAIM_COUNT_QUERY
+        totals_query = self.RECEIVE_TOTALS_QUERY if is_receive else self.CLAIM_TOTALS_QUERY
+
+        sql_params = {'branch_id': params['branch_id']}
+        sql_params.update(extra_params)
+
+        count_rows = self._execute_query(count_query, sql_params, filter_snippets)
+        total_count = count_rows[0]['total'] if count_rows else 0
+
+        total_rows = self._execute_query(totals_query, sql_params, filter_snippets)
+        totals = total_rows[0] if total_rows else {}
+
+        return total_count, totals
+
+    def get(self, request):
+        try:
+            params = self._get_common_params(request)
+        except ValidationError as e:
+            return Response(e.detail, status=status.HTTP_400_BAD_REQUEST)
+
+        output = request.query_params.get('export', 'html').lower()
+        if output == 'pdf':
+            return self._export_pdf(request, params)
+        elif output == 'excel':
+            return self._export_excel(request, params)
+        return self._html_view(request, params)
+
+    def fmt_date(self, value):
+        if value is None:
+            return ""
+        if isinstance(value, (datetime, date)):
+            return value.strftime("%d-%b-%Y")
+        try:
+            dt = datetime.strptime(value, "%Y-%m-%d")
+            return dt.strftime("%d-%b-%Y")
+        except (TypeError, ValueError):
+            return str(value)
+
+    def _html_view(self, request, params):
+        page_val = request.query_params.get('page', '1')
+        try:
+            page = int(page_val)
+        except (ValueError, TypeError):
+            page = 1
+        page_size = int(request.query_params.get('page_size', 50))
+        offset = (page - 1) * page_size
+
+        filter_snippets, extra_params = self._build_filters(params, params['report_type'])
+        query_template = self.RECEIVE_QUERY if params['report_type'] == 'receive' else self.CLAIM_QUERY
+
+        sql_params = {'branch_id': params['branch_id']}
+        sql_params.update(extra_params)
+        sql_params['offset'] = offset
+        sql_params['limit'] = page_size
+
+        paginated_query = query_template + ' OFFSET %(offset)s LIMIT %(limit)s'
+        rows = self._execute_query(paginated_query, sql_params, filter_snippets)
+        total_count, totals = self._get_count_and_totals(params)
+        total_pages = max(1, (total_count + page_size - 1) // page_size)
+
+        return Response({
+            'data': rows,
+            'page': page,
+            'page_size': page_size,
+            'total_count': total_count,
+            'total_pages': total_pages,
+            'totals': totals,
+            'filter_params': {
+                'report_type': params['report_type'],
+                'parent_customer': params.get('parent_customer'),
+                'instrument_ids': params.get('instrument_ids'),
+                'date_from': params.get('date_from'),
+                'date_to': params.get('date_to'),
+                'date_mode': params.get('date_mode'),
+                'refund_status': params.get('refund_status'),
+                'has_comments': params.get('has_comments'),
+            }
+        })
+
+    def _export_pdf(self, request, params):
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        from reportlab.lib.pagesizes import A4, landscape
+        from reportlab.lib import colors
+        from reportlab.lib.styles import getSampleStyleSheet
+        from reportlab.lib.units import mm
+
+        data = self._get_data(params)
+        total_count, totals = self._get_count_and_totals(params)
+
+        buf = io.BytesIO()
+        doc = SimpleDocTemplate(buf, pagesize=landscape(A4), rightMargin=10*mm, leftMargin=10*mm, topMargin=10*mm, bottomMargin=15*mm)
+        styles = getSampleStyleSheet()
+        elements = []
+
+        title = 'Received Report' if params['report_type'] == 'receive' else 'Claim Report'
+        elements.append(Paragraph(title, styles['Title']))
+        elements.append(Spacer(1, 6*mm))
+
+        filter_text = f"Report Type: {params['report_type']}"
+        if params.get('parent_customer'):
+            filter_text += f" | Parent: {params['parent_customer']}"
+        if params.get('date_from'):
+            filter_text += f" | From: {params['date_from']}"
+        if params.get('date_to'):
+            filter_text += f" | To: {params['date_to']}"
+        elements.append(Paragraph(filter_text, styles['Normal']))
+        elements.append(Spacer(1, 4*mm))
+
+        if params['report_type'] == 'receive':
+            cols = ['SL No', 'Received Date', 'Organization', 'Instrument', 'Instrument No', 'Amount', 'Remarks']
+            table_data = [[r['sl_no'], self.fmt_date(r['received_date']), r['organization_name'] or '', r['instrument_name'] or '', r['instrument_number'] or '', str(r['amount']), r['remarks'] or ''] for r in data]
+        else:
+            cols = ['SL No', 'Claim Date', 'Organization', 'Instrument', 'Instrument No', 'Amount', 'Refund', 'Refund Date', 'Refund Amt', 'Remaining', 'Remarks']
+            table_data = [[r['sl_no'], self.fmt_date(r['claim_date']), r['organization_name'] or '', r['instrument_name'] or '', r['instrument_number'] or '', str(r['amount']), 'Yes' if r['refund_amount'] and float(r['refund_amount']) > 0 else 'No', self.fmt_date(r['refund_date']), str(r['refund_amount'] or 0), str(r['remaining_amount'] or 0), r['remarks'] or ''] for r in data]
+
+        header = [cols]
+        body = header + table_data
+        # Footer row
+        if params['report_type'] == 'receive' and totals:
+            footer = ['', '', '', '', 'Total:', str(totals.get('total_amount', 0)), '']
+            body.append(footer)
+        elif totals:
+            footer = ['', '', '', '', 'Total:', str(totals.get('total_amount', 0)), '', '', str(totals.get('total_refund', 0)), str(totals.get('total_remaining', 0)), '']
+            body.append(footer)
+
+        t = Table(body)
+        t.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2c3e50')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('FONTSIZE', (0, 0), (-1, -1), 7),
+            ('GRID', (0, 0), (-1, -1), 0.3, colors.grey),
+            ('ALIGN', (5, 0), (5, -1), 'RIGHT'),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -2), [colors.white, colors.HexColor('#f8f9fa')]),
+            ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#d4edda')),
+        ]))
+        elements.append(t)
+        doc.build(elements)
+        buf.seek(0)
+
+        filename = 'received_report.pdf' if params['report_type'] == 'receive' else 'claim_report.pdf'
+        response = HttpResponse(buf, content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
+
+    def _export_excel(self, request, params):
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+
+        data = self._get_data(params)
+        total_count, totals = self._get_count_and_totals(params)
+
+        wb = Workbook()
+        ws = wb.active
+        title = 'Received Report' if params['report_type'] == 'receive' else 'Claim Report'
+        ws.title = title
+
+        header_font = Font(name='Calibri', bold=True, size=11, color='FFFFFF')
+        header_fill = PatternFill(start_color='2F5496', end_color='2F5496', fill_type='solid')
+        header_alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+
+        title_font = Font(name='Calibri', bold=True, size=14, color='2F5496')
+        label_font = Font(name='Calibri', bold=True, size=10)
+        value_font = Font(name='Calibri', size=10)
+
+        thin_border = Border(
+            left=Side(style='thin', color='B0B0B0'),
+            right=Side(style='thin', color='B0B0B0'),
+            top=Side(style='thin', color='B0B0B0'),
+            bottom=Side(style='thin', color='B0B0B0'),
+        )
+        date_alignment = Alignment(horizontal='center', vertical='center')
+        number_alignment = Alignment(horizontal='right', vertical='center')
+        text_alignment = Alignment(horizontal='left', vertical='center', wrap_text=True)
+
+        max_col = 7 if params['report_type'] == 'receive' else 11
+        last_col_letter = get_column_letter(max_col)
+
+        ws.merge_cells(f'A1:{last_col_letter}1')
+        title_cell = ws['A1']
+        title_cell.value = title
+        title_cell.font = title_font
+        title_cell.alignment = Alignment(horizontal='left', vertical='center')
+        ws.row_dimensions[1].height = 30
+
+        parent_customer_alias = params.get('parent_customer')
+        parent_customer_name = 'All'
+        if parent_customer_alias:
+            try:
+                parent_customer_name = Customer.objects.values_list('name', flat=True).get(alias_id=parent_customer_alias)
+            except Customer.DoesNotExist:
+                pass
+
+        filter_info = [
+            ('Report Type', params['report_type']),
+            ('Parent Customer', parent_customer_name),
+            ('Date From', params.get('date_from', 'N/A')),
+            ('Date To', params.get('date_to', 'N/A')),
+        ]
+        if params['report_type'] == 'claim':
+            filter_info.insert(1, ('Date Mode', params.get('date_mode', 'received_date')))
+            filter_info.insert(2, ('Refund Status', params.get('refund_status', 'all')))
+
+        for i, (label, value) in enumerate(filter_info):
+            row_num = 2 + i
+            ws.cell(row=row_num, column=1, value=label).font = label_font
+            ws.merge_cells(start_row=row_num, start_column=2, end_row=row_num, end_column=4)
+            val_cell = ws.cell(row=row_num, column=2, value=value)
+            val_cell.font = value_font
+            val_cell.alignment = Alignment(horizontal='left', vertical='center')
+
+        ws.append([])
+
+        if params['report_type'] == 'receive':
+            cols = ['SL No', 'Received Date', 'Organization Name', 'Instrument Name', 'Instrument Number', 'Amount', 'Remarks']
+            col_widths = {1: 8, 2: 16, 3: 28, 4: 22, 5: 18, 6: 16, 7: 30}
+        else:
+            cols = ['SL No', 'Claim Date', 'Organization Name', 'Instrument Name', 'Instrument Number', 'Amount', 'Refund', 'Refund Date', 'Refund Amount', 'Remaining Amount', 'Remarks']
+            col_widths = {1: 8, 2: 16, 3: 28, 4: 22, 5: 18, 6: 16, 7: 10, 8: 16, 9: 16, 10: 18, 11: 30}
+
+        header_row = ws.max_row + 1
+        for col_idx, col_name in enumerate(cols, 1):
+            cell = ws.cell(row=header_row, column=col_idx, value=col_name)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = header_alignment
+            cell.border = thin_border
+        ws.row_dimensions[header_row].height = 28
+
+        for row in data:
+            data_row_num = ws.max_row + 1
+            if params['report_type'] == 'receive':
+                values = [
+                    (1, int(row.get('sl_no', 0)), number_alignment),
+                    (2, self.fmt_date(row.get('received_date')), date_alignment),
+                    (3, row.get('organization_name', ''), text_alignment),
+                    (4, row.get('instrument_name', ''), text_alignment),
+                    (5, row.get('instrument_number', ''), text_alignment),
+                    (6, float(row.get('amount', 0)), number_alignment),
+                    (7, row.get('remarks', ''), text_alignment),
+                ]
+            else:
+                values = [
+                    (1, int(row.get('sl_no', 0)), number_alignment),
+                    (2, self.fmt_date(row.get('claim_date')), date_alignment),
+                    (3, row.get('organization_name', ''), text_alignment),
+                    (4, row.get('instrument_name', ''), text_alignment),
+                    (5, row.get('instrument_number', ''), text_alignment),
+                    (6, float(row.get('amount', 0)), number_alignment),
+                    (7, 'Yes' if row.get('refund_amount') and float(row['refund_amount']) > 0 else 'No', text_alignment),
+                    (8, self.fmt_date(row.get('refund_date')), date_alignment),
+                    (9, float(row.get('refund_amount', 0) or 0), number_alignment),
+                    (10, float(row.get('remaining_amount', 0) or 0), number_alignment),
+                    (11, row.get('remarks', ''), text_alignment),
+                ]
+
+            for col_idx, val, align in values:
+                cell = ws.cell(row=data_row_num, column=col_idx, value=val)
+                cell.font = value_font
+                cell.alignment = align
+                cell.border = thin_border
+
+        for col_idx in range(1, max_col + 1):
+            ws.column_dimensions[get_column_letter(col_idx)].width = col_widths.get(col_idx, 14)
+
+        ws.freeze_panes = f'A{header_row + 1}'
+        ws.auto_filter.ref = f'A{header_row}:{last_col_letter}{ws.max_row}'
+
+        filename = 'received_report.xlsx' if params['report_type'] == 'receive' else 'claim_report.xlsx'
+        response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        wb.save(response)
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
         return response

@@ -141,6 +141,7 @@ const menuItems = ref([
     icon: 'bi-bar-chart',
     submenu: [
     { name: 'Credit Sales', link: '/reports/invoice', icon: 'bi-receipt' },
+    { name: 'Received and Claim', link: '/reports/received-claim', icon: 'bi-receipt' },
     // { name: 'Customer Statement', link: '/reports/customer-statement', icon: 'bi-receipt' },   
     // { name: 'Payment Detail', link: '/reports/invoice/cheque', icon: 'bi-graph-up' },
     // { name: 'Customer Due Payements', link: '/due-payements', icon: 'bi-receipt' }

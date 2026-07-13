@@ -8,7 +8,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from django.conf import settings
 from django.conf.urls.static import static
 from cheques.views import CustomTokenObtainPairView, user_detail
-from cheques.views import ParentCustomerDueReport, CreditInvoiceReportView
+from cheques.views import ParentCustomerDueReport, CreditInvoiceReportView, ReceivedClaimReportView
  #, CIvsChequeReportView
 # from cheques.views import frontend_config
 
@@ -20,6 +20,7 @@ urlpatterns = [
     path('api/health/', health_check, name='health_check'),
     path('admin/', admin.site.urls),
     path('v1/chq/reports/invoice/', CreditInvoiceReportView.as_view(), name='credit-invoice-report'),
+    path('v1/chq/reports/received-claim/', ReceivedClaimReportView.as_view(), name='received-claim-report'),
     path('v1/chq/parent-customer-due-report/', ParentCustomerDueReport.as_view(), name='parent-customer-due-report'),
     # path('v1/chq/unallocated-payments/', unallocated_payments, name='unallocated-payments'),
     # path('v1/chq/reports/invoice-payments/', InvoicePaymentReportView.as_view(), name='invoice-payment-report'),
