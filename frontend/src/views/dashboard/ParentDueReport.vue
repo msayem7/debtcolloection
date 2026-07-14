@@ -99,7 +99,7 @@
                   </tr>
                   <template v-if="expandedParents.includes(parent.alias_id)">
                     <tr
-                      v-for="child in parent.children.filter(c => c.total_due > 0)"
+                      v-for="child in parent.children.filter(c => c.total_due !== 0)"
                       :key="child.alias_id"
                       class="child-row"
                     >
@@ -184,10 +184,10 @@ const currentBranchName = computed(() => {
 const filteredParents = computed(() => {
   return reportData.value.data.filter(parent => {
     // Show parent if it has any due amount
-    if (parent.total_due > 0) return true
+    if (parent.total_due !== 0) return true
 
     // Or if any of its children have due amounts
-    return parent.children.some(child => child.total_due > 0)
+    return parent.children.some(child => child.total_due !== 0)
   })
 })
 

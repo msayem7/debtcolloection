@@ -1,3 +1,7 @@
+1. Have  payment but not in payment details table (Payment Id 41,42). Need to fix the bug immediately.
+    how to find out root cause:
+       a. check code for partial commit or update or delete
+    Solved: May it any how it created in test environment but in live environment it is not found.
 2. Shortage amount is not calculated correctly. Need to fix the bug immediately.
       a. No shortage problem. checked by this query
           SELECT 

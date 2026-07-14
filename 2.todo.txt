@@ -30,4 +30,6 @@ Feature:
 
 10. Check Consistency page. It will run once a day before run invoices. It forcing user and keep a log. 
 
-12. Negetive due found. but dashboard did not consider the nagetive due. Negetive due should be hilighted in red in dashboard and all reports
+Done 12. Negetive due found. but dashboard did not consider the negetive due. Negetive due should be hilighted in red in dashboard and all reports
+13. add note in invoice entry page
+14

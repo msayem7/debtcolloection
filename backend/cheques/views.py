@@ -768,12 +768,12 @@ class ParentCustomerDueReport(APIView):
             )
 
         # Query 1: Get all parent-child relationships with alias_id
-        customer_hierarchy = Customer.objects.filter(
+        customer_hierarchy = customer_qs.filter(
             ( Q(is_parent=True) | Q(parent__isnull=False))
         ).values('alias_id', 'name', 'is_parent', 'parent__alias_id', 'parent__name')
 
         # Query 2: Get all due invoice amounts grouped by customer
-        due_amounts = CreditInvoice.objects.filter(
+        due_amounts = invoice_qs.filter(
             customer__parent__isnull=False,  # Only child customers
             transaction_date__lte=report_date
         ).filter(
@@ -943,13 +943,13 @@ class ParentCustomerDueReport(APIView):
                     immature = float(amounts.get('immature_due', 0) or 0)
                     total = matured + immature
 
-                    if total > 0:
+                    if total != 0:
                         child_rows.append((child['name'], matured, immature, total))
                         parent_matured += matured
                         parent_immature += immature
                         parent_total += total
 
-            if parent_total > 0 or len(child_rows) > 0:
+            if parent_total != 0 or len(child_rows) > 0:
                 # Write parent row
                 cells_data = [
                     (1, parent['name'], text_alignment, True),
