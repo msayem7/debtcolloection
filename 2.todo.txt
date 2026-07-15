@@ -6,6 +6,8 @@
 
 Feature: 
 01. Credit Invoice wise payment report
+    a. add a fileter "Due date". From date and to date filter on due date column.
+    b. Add Remarks column in this report and Show data which have remarks. 
 02. Want to see payment detail against each invoice from invoice list. --- Done
 03. Add Feature "Save and Continue" :
     a. Credit invoice entry -- done
@@ -29,4 +31,7 @@ Feature:
 09. While doing a particular payment editing, typing perform very very slowly. like takes 5 seconds to refresh. thats entry is 23-may-2026, customer ACI logistics, 57 invoices against this payment. but other entries are not that much slow.
 
 10. Check Consistency page. It will run once a day before run invoices. It forcing user and keep a log. 
-12. 
+
+Done 12. Negetive due found. but dashboard did not consider the negetive due. Negetive due should be hilighted in red in dashboard and all reports
+13. add note in invoice entry page
+14

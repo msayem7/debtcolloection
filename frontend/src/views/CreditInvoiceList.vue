@@ -78,6 +78,7 @@
               <th>Sale</th>
               <th>Return</th>
               <th>Net Sale</th>
+              <th>Remarks</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -92,6 +93,7 @@
               <td>{{ formatNumber(invoice.sales_amount) }}</td>
               <td>{{ formatNumber(invoice.sales_return) }}</td>
               <td>{{ formatNumber(invoice.sales_amount -invoice.sales_return)}}</td>
+              <td>{{ invoice.remarks || '-' }}</td>
               <td>
                 <button 
                   @click="viewPaymentDetails(invoice.payment)"
@@ -110,11 +112,11 @@
             </tr> 
             <!-- Add empty state message -->
             <tr v-if="invoices.length === 0">
-              <td colspan="10" class="text-center">No invoices found</td>
+              <td colspan="11" class="text-center">No invoices found</td>
             </tr>
             <!-- Summary Row -->
             <tr v-if="invoices.length > 0" class="bg-light fw-bold">
-              <td colspan="6">Total ({{ invoices.length }} invoices)</td>
+              <td colspan="7">Total ({{ invoices.length }} invoices)</td>
               <td>{{ formatNumber(totalSales) }}</td>
               <td>{{ formatNumber(totalSalesReturn) }}</td>
               <td>{{ formatNumber(totalNetSales) }}</td>

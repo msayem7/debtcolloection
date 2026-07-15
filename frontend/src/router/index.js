@@ -7,7 +7,7 @@ import CustomersView from '../views/CustomersView';
 import DuePayementsView from '../views/DuePayementsView';
 import PendingListView from '../views/PendingListView';
 // import ChequeDepositedView from '../views/ChequeDepositedView';
-// import InvoiceChequeRep from '@/reports/InvoiceChequeRep.vue';
+//import InvoiceChequeRep from '@/reports/InvoiceChequeRep.vue';
 import SalesDetailReport from '../views/SalesDetailReport';
 //import ChargesListView from '@/views/ChargesListView.vue';
 import DiductionsView from '@/views/archive_vue/DiductionsView.vue';
@@ -109,6 +109,12 @@ const routes = [
       path: '/reports/customer-statement',
       name: 'CustomerStatementReport',
       component: () => import('@/views/reports/CustomerStatementReport.vue'),
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/reports/received-claim',
+      name: 'ReceivedClaimReport',
+      component: () => import('@/views/reports/ReceivedClaimReport.vue'),
       meta: { requiresAuth: true }
     }
 ];

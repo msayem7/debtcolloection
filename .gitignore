@@ -87,3 +87,4 @@ pnpm-debug.log*
 #ignore claude or kilo folders
 .claude/
 .kilo/
+kilo.json

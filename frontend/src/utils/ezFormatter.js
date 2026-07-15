@@ -10,27 +10,14 @@ export function formatDateTime (dateString) {
 }
 
 export function formatDate(dateString) {
-  
-  // console.log("VUE_APP_DATE_FORMAT=", process.env.VUE_APP_DATE_FORMAT, "VUE_APP_DIGITS_AFTER_DECIMAL=", 
-  //   process.env.VUE_APP_DIGITS_AFTER_DECIMAL, "VUE_APP_DISPLAY_SYSTEM=", process.env.VUE_APP_DISPLAY_SYSTEM)
-
   const date = new Date(dateString);
   if (isNaN(date)) {
     return "Invalid Date";
   }
-
-  // eslint-disable-next-line
-  const options = {
-    timeZone: 'Asia/Dhaka',
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  };
-  
-  //'return date.toLocaleString('en-IN', options);
-  const parts= date.toISOString().split('T');
-  return parts[0];
-
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = monthNames[date.getMonth()];
+  const year = date.getFullYear();
+  return `${day}-${month}-${year}`;
 }
 
 export function ServerDateFormat(dateString){
