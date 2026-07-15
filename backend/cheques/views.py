@@ -1543,7 +1543,7 @@ class CreditInvoiceReportView(APIView):
         date_to_str = self.fmt_date(date_to) if date_to else 'N/A'
 
         filter_info = [
-            ('Report Date', params['report_date']),
+            ('Report Date', self.fmt_date(params['report_date'])),
             ('Status', params['status']),
             ('Date Mode', params['date_mode']),
             ('Date From', date_from_str),
@@ -2106,8 +2106,8 @@ class ReceivedClaimReportView(APIView):
         filter_info = [
             ('Report Type', params['report_type']),
             ('Parent Customer', parent_customer_name),
-            ('Date From', params.get('date_from', 'N/A')),
-            ('Date To', params.get('date_to', 'N/A')),
+            ('Date From', self.fmt_date(params.get('date_from')) if params.get('date_from') else 'N/A'),
+            ('Date To', self.fmt_date(params.get('date_to')) if params.get('date_to') else 'N/A'),
         ]
         if params['report_type'] == 'claim':
             filter_info.insert(1, ('Date Mode', params.get('date_mode', 'received_date')))
