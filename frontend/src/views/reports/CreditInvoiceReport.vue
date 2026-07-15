@@ -12,8 +12,9 @@
           <div class="col-md-3">
             <label class="form-label">Invoice Status</label>
             <select v-model="filters.status" class="form-select" @change="onStatusChange">
-              <option value="all">All Invoices</option>
+<option value="all">All Invoices</option>
               <option value="due">Due</option>
+              <option value="immature_due">Immature Due</option>
               <option value="matured_due">Matured Due</option>
               <option value="paid">Paid</option>
             </select>
@@ -396,10 +397,10 @@ const colResizing = ref({ pane: null, col: null, startX: 0, startWidth: 0 })
 // Computed
 const hasData = computed(() => reportData.value.length > 0)
 const isReceivedDateDisabled = computed(() => {
-  return filters.status === 'due' || filters.status === 'matured_due'
+  return filters.status === 'due' || filters.status === 'immature_due' || filters.status === 'matured_due'
 })
 const receivedDateDisabledTooltip = computed(() => {
-  return isReceivedDateDisabled.value ? 'Received Date filter not applicable for Due/Matured statuses.' : ''
+  return isReceivedDateDisabled.value ? 'Received Date filter not applicable for Due/Immature Due/Matured statuses.' : ''
 })
 const isInteractiveAvailable = computed(() => {
   return filters.status === 'paid'

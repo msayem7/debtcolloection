@@ -1188,6 +1188,8 @@ class CreditInvoiceReportView(APIView):
 
         status = params.get('status', 'all')
         if status == 'due':
+            snippets['status_filter'] = ' AND ci.payment_id IS NULL'
+        elif status == 'immature_due':
             snippets['status_filter'] = (
                 " AND ci.payment_id IS NULL"
                 " AND (ci.transaction_date + ci.payment_grace_days) >= %(report_date)s::date"
@@ -1215,7 +1217,7 @@ class CreditInvoiceReportView(APIView):
 
         # Date filter - Received date mode only valid for 'all' and 'paid'
         date_mode = params.get('date_mode', 'transaction_date')
-        if status in ('due', 'matured_due'):
+        if status in ('due', 'immature_due', 'matured_due'):
             date_mode = 'transaction_date'
 
         date_from = params.get('date_from')
@@ -1427,7 +1429,7 @@ class CreditInvoiceReportView(APIView):
             if pid is None:
                 hdr_data = [['Unpaid', '', '', '']]
             else:
-                hdr_data = [[str(first.get('received_date') or ''), str(first.get('cheque_cash_amount') or '0'), str(first.get('claim_amount') or '0'), str(first.get('shortage_amount') or '0')]]
+                hdr_data = [[self.fmt_date(first.get('received_date') or ''), str(first.get('cheque_cash_amount') or '0'), str(first.get('claim_amount') or '0'), str(first.get('shortage_amount') or '0')]]
 
             ht = Table([header_cols] + hdr_data)
             ht.setStyle(TableStyle([
@@ -1441,7 +1443,7 @@ class CreditInvoiceReportView(APIView):
             elements.append(ht)
             elements.append(Spacer(1, 2*mm))
 
-            d_rows = [[r['sl_no'], r['parent_organization'] or '', r['customer_name'] or '', str(r['transaction_date']), str(r['grace_days']), str(r.get('due_date', r.get('Due_Date', '')) or ''), str(r['sales_amount']), str(r['sales_return']), str(r['net_sales']), str(r['days_overdue'])] for r in rows]
+            d_rows = [[r['sl_no'], r['parent_organization'] or '', r['customer_name'] or '', self.fmt_date(r['transaction_date']), str(r['grace_days']), self.fmt_date(r.get('due_date', r.get('Due_Date', '')) or ''), str(r['sales_amount']), str(r['sales_return']), str(r['net_sales']), str(r['days_overdue'])] for r in rows]
             dt = Table([detail_cols] + d_rows)
             dt.setStyle(TableStyle([
                 ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2c3e50')),
@@ -1666,9 +1668,9 @@ class CreditInvoiceReportView(APIView):
 
             for row in data:
                 if params['show_instrument_numbers']:
-                    writer.writerow([row.get("sl_no") or "", row.get("parent_organization") or "", row.get("customer_name") or "", row.get("transaction_date") or "", row.get("grace_days") or 0, row.get("Due_Date") or row.get("due_date") or "", row.get("received_date") or "", row.get("sales_amount") or 0, row.get("sales_return") or 0, row.get("net_sales") or 0, row.get("cheque_numbers") or "", row.get("cheque_cash_amount") or 0, row.get("claim_numbers") or "", row.get("claim_amount") or 0, row.get("shortage_amount") or 0, str(row.get('payment_sl') or ''), row.get("days_overdue") or 0])
+                    writer.writerow([row.get("sl_no") or "", row.get("parent_organization") or "", row.get("customer_name") or "", self.fmt_date(row.get("transaction_date")), row.get("grace_days") or 0, self.fmt_date(row.get("Due_Date") or row.get("due_date")), self.fmt_date(row.get("received_date")), row.get("sales_amount") or 0, row.get("sales_return") or 0, row.get("net_sales") or 0, row.get("cheque_numbers") or "", row.get("cheque_cash_amount") or 0, row.get("claim_numbers") or "", row.get("claim_amount") or 0, row.get("shortage_amount") or 0, str(row.get('payment_sl') or ''), row.get("days_overdue") or 0])
                 else:
-                    writer.writerow([row.get("sl_no") or "", row.get("parent_organization") or "", row.get("customer_name") or "", row.get("transaction_date") or "", row.get("grace_days") or 0, row.get("Due_Date") or row.get("due_date") or "", row.get("received_date") or "", row.get("sales_amount") or 0, row.get("sales_return") or 0, row.get("net_sales") or 0, row.get("cheque_cash_amount") or 0, row.get("claim_amount") or 0, row.get("shortage_amount") or 0, str(row.get('payment_sl') or ''), row.get("days_overdue") or 0])
+                    writer.writerow([row.get("sl_no") or "", row.get("parent_organization") or "", row.get("customer_name") or "", self.fmt_date(row.get("transaction_date")), row.get("grace_days") or 0, self.fmt_date(row.get("Due_Date") or row.get("due_date")), self.fmt_date(row.get("received_date")), row.get("sales_amount") or 0, row.get("sales_return") or 0, row.get("net_sales") or 0, row.get("cheque_cash_amount") or 0, row.get("claim_amount") or 0, row.get("shortage_amount") or 0, str(row.get('payment_sl') or ''), row.get("days_overdue") or 0])
                 yield buf.getvalue()
                 buf.seek(0)
                 buf.truncate(0)
