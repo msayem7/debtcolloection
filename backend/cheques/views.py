@@ -1192,13 +1192,13 @@ class CreditInvoiceReportView(APIView):
         elif status == 'immature_due':
             snippets['status_filter'] = (
                 " AND ci.payment_id IS NULL"
-                " AND (ci.transaction_date + ci.payment_grace_days) >= %(report_date)s::date"
+                " AND (ci.transaction_date + ci.payment_grace_days) > %(report_date)s::date"
             )
             extra_params['report_date'] = params['report_date']
         elif status == 'matured_due':
             snippets['status_filter'] = (
                 " AND ci.payment_id IS NULL"
-                " AND (ci.transaction_date + ci.payment_grace_days) < %(report_date)s::date"
+                " AND (ci.transaction_date + ci.payment_grace_days) <= %(report_date)s::date"
             )
             extra_params['report_date'] = params['report_date']
         elif status == 'paid':
