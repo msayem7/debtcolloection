@@ -104,7 +104,7 @@ class CreditInvoiceSerializer(serializers.ModelSerializer):
     class Meta:
         model = CreditInvoice
         fields = ('alias_id', 'branch', 'grn', 'customer','customer_name', 'transaction_date'
-                  ,'sales_amount','sales_return', 'net_due' ,'payment_grace_days', 'payment', 'payment_date', 'status', 'version' #'allocated',
+                  ,'sales_amount','sales_return', 'net_due' ,'payment_grace_days', 'payment', 'payment_date', 'status', 'version', 'remarks'
                   )
         read_only_fields = ('alias_id', 'payment_date', 'version') #, 'updated_at', 'updated_by'
         optional_fields = ['payment']

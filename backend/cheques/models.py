@@ -204,7 +204,7 @@ class CreditInvoice(models.Model):
     customer = models.ForeignKey(Customer, on_delete=models.PROTECT, blank=False, null=False)    
     transaction_date = models.DateField(blank=False, null=False)
     delivery_man = models.TextField(blank=True, null=True)
-    transaction_details = models.TextField(blank=True, null=True)
+    remarks = models.TextField(blank=True, null=True)
     sales_amount = models.DecimalField(max_digits=18, decimal_places=4)
     sales_return = models.DecimalField(max_digits=18, decimal_places=4)
     payment_grace_days = models.IntegerField(default=0)

@@ -6,6 +6,8 @@
 
 Feature: 
 01. Credit Invoice wise payment report
+    a. add a fileter "Due date". From date and to date filter on due date column.
+    b. Add Remarks column in this report and Show data which have remarks. 
 02. Want to see payment detail against each invoice from invoice list. --- Done
 03. Add Feature "Save and Continue" :
     a. Credit invoice entry -- done

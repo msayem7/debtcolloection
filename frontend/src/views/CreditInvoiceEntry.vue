@@ -143,16 +143,20 @@
               style="max-width: 300px; max-height: 200px"
               alt="Current invoice"
             >
-          </div>          
+</div>          
         </div>
-        <!-- <div class="col-12">
-          <CustomerClaims
-            ref="customerClaimsRef"
-            v-if="form.grn"
-            :customerAliasId="form.customer"
-            :invoiceAliasId="invoiceId"
-          />
-        </div> -->
+
+        <!-- Remarks -->
+        <div class="col-12 form-floating">
+          <textarea 
+            v-model="form.remarks" 
+            class="form-control" 
+            id="remarks"
+            placeholder=" "
+            style="height: 100px"
+          ></textarea>
+          <label for="remarks">Remarks</label>
+        </div>
 
         <!-- Action Buttons -->
         <!-- <div class="col-12">
@@ -215,7 +219,8 @@ const form = ref({
   sales_amount: 0,
   sales_return: 0,
   invoice_image: null,
-  version: 1
+  version: 1,
+  remarks: ''
 })
 
 // const customerClaimsRef = ref(null)
@@ -433,6 +438,7 @@ const handleSubmit = async () => {
       form.value.sales_return = 0
       form.value.invoice_image = null
       form.value.version = 1
+      form.value.remarks = ''
 
       // Reset image previews
       imagePreview.value = null
