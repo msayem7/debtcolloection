@@ -21,17 +21,36 @@ Feature:
     c. Claim
     d. other UI
 04. Show data in grid and add pagination
-05. Convert data from excel
-06. Number of invoice in payment
+X 05. Convert data from excel
+X 06. Number of invoice in payment
 07. Only detail will expand
 
-08. a. In payment entry page, add filter button to filter due invoices data in the grid at frontend. like invoice date range, child customer, GRN number, amount, matured invoices, show selected invoices only. 
+--------------------------------------------------------------------------------
+08. In payment entry page, 
+    a. add filters button to filter due invoices data in the grid at frontend. like 
+        i. invoice date range
+        ii. Due, matured, immature
+        iii. amount range
+        iv. show selected invoices only.
+        v. child customer
+        vi. GRN number
     b. split the page from top to grid end. Payment Date, parent customer,  and summary section will be displayed at left pannel and filter and invoicess will be displayed at right pannel.buttons will be displayed at bottom.
+----------------------------------------------------------------------------------------
+
 
 09. While doing a particular payment editing, typing perform very very slowly. like takes 5 seconds to refresh. thats entry is 23-may-2026, customer ACI logistics, 57 invoices against this payment. but other entries are not that much slow.
 
 10. Check Consistency page. It will run once a day before run invoices. It forcing user and keep a log. 
 
-Done 12. Negetive due found. but dashboard did not consider the negetive due. Negetive due should be hilighted in red in dashboard and all reports
-13. add note in invoice entry page
-14
+Done 12. Negetive due found. but dashboard did not consider the negetive due. 
+12.1   Negetive due should be hilighted in red in dashboard and all reports
+Done 13. add note in invoice entry page
+
+
+--------------------------------------------------------------------------
+14. Office Claim Entry, edit and refund and recovery. 
+     a. Need to know details. How to submit and collect from suppier
+     b. Is this claim replace any axisting or ajusted with existing claim.
+     c. Is Calim refund with generating another claim. 
+-------------------------------------------------------------------------
+15. 
