@@ -116,6 +116,12 @@ const routes = [
       name: 'ReceivedClaimReport',
       component: () => import('@/views/reports/ReceivedClaimReport.vue'),
       meta: { requiresAuth: true }
+    },
+    {
+      path: '/tools/text-to-sql',
+      name: 'TextToSql',
+      component: () => import('@/views/TextToSqlView.vue'),
+      meta: { requiresAuth: true }
     }
 ];
 

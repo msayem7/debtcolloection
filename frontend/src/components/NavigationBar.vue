@@ -146,6 +146,13 @@ const menuItems = ref([
     // { name: 'Payment Detail', link: '/reports/invoice/cheque', icon: 'bi-graph-up' },
     // { name: 'Customer Due Payements', link: '/due-payements', icon: 'bi-receipt' }
     ]
+  },
+  {
+    name: 'Tools',
+    icon: 'bi-tools',
+    submenu: [
+    { name: 'Text-to-SQL', link: '/tools/text-to-sql', icon: 'bi-robot' },
+    ]
   }
 ]);
 

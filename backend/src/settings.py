@@ -74,7 +74,8 @@ INSTALLED_APPS = [
     'django_filters',
     'django_extensions',
     'rest_framework_simplejwt',
-    'cheques.apps.ChequesConfig', 
+    'cheques.apps.ChequesConfig',
+    'text_to_sql',
 ]
 
 MIDDLEWARE = [
@@ -371,6 +372,8 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 DATE_FORMAT = '%b %d, %Y'  # Mar 04, 2025 format
 DECIMAL_PLACES = 0
+
+BASE_URL = config('BASE_URL', default='http://localhost:8000')
 
 
 

@@ -25,6 +25,7 @@ urlpatterns = [
     # path('v1/chq/unallocated-payments/', unallocated_payments, name='unallocated-payments'),
     # path('v1/chq/reports/invoice-payments/', InvoicePaymentReportView.as_view(), name='invoice-payment-report'),
     path('v1/chq/', include('cheques.urls')),
+    path('v1/chq/', include('text_to_sql.urls')),
     
     # path('v1/chq/reports/ci-vs-cheque/', CIvsChequeReportView.as_view({'get': 'list'}), name='ci-cheque-report'),
     # path('v1/chq/reports/ci-vs-cheque/export_pdf/', CIvsChequeReportView.as_view(actions={'get': 'export_pdf'}), name='ci-cheque-report-pdf'),
