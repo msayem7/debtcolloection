@@ -21,7 +21,7 @@ class ApiKeyProfile(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        db_table = 'text_to_sql_api_key_profile'
+        db_table = 'ai_data_assistant_api_key_profile'
         verbose_name = 'API Key Profile'
         verbose_name_plural = 'API Key Profiles'
 
@@ -29,7 +29,7 @@ class ApiKeyProfile(models.Model):
         return f"{self.profile_name} ({self.provider})"
 
 
-class TextToSqlLog(models.Model):
+class AIDataAssistantLog(models.Model):
     user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
     branch = models.ForeignKey(Branch, on_delete=models.SET_NULL, null=True)
     question = models.TextField()
@@ -49,9 +49,9 @@ class TextToSqlLog(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        db_table = 'text_to_sql_log'
-        verbose_name = 'Text-to-SQL Log'
-        verbose_name_plural = 'Text-to-SQL Logs'
+        db_table = 'ai_data_assistant_log'
+        verbose_name = 'AI Data Assistant Log'
+        verbose_name_plural = 'AI Data Assistant Logs'
         indexes = [
             models.Index(fields=['user', '-created_at']),
             models.Index(fields=['branch', '-created_at']),
@@ -60,3 +60,4 @@ class TextToSqlLog(models.Model):
 
     def __str__(self):
         return f"[{'OK' if self.success else 'FAIL'}] {self.question[:60]}"
+

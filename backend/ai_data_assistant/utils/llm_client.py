@@ -10,7 +10,7 @@ from decimal import Decimal
 import requests
 from django.conf import settings
 
-from text_to_sql.models import ApiKeyProfile
+from ai_data_assistant.models import ApiKeyProfile
 
 logger = logging.getLogger(__name__)
 
@@ -106,7 +106,7 @@ class LlmClient:
 
         if self.provider == 'openrouter':
             headers['HTTP-Referer'] = settings.BASE_URL if hasattr(settings, 'BASE_URL') else 'http://localhost:8000'
-            headers['X-Title'] = 'Debt Collection Text-to-SQL'
+            headers['X-Title'] = 'Debt Collection AI Data Assistant'
 
         return headers
 
@@ -168,3 +168,4 @@ class LlmClient:
                 except Exception:
                     pass
             raise LlmClientError(f"LLM API error: {str(e)} {error_detail}")
+

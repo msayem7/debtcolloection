@@ -75,7 +75,7 @@ INSTALLED_APPS = [
     'django_extensions',
     'rest_framework_simplejwt',
     'cheques.apps.ChequesConfig',
-    'text_to_sql',
+    'ai_data_assistant',
 ]
 
 MIDDLEWARE = [

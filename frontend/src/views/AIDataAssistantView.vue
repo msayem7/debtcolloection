@@ -1,9 +1,9 @@
 <template>
-  <div class="text-to-sql-container">
+  <div class="ai-data-assistant-container">
     <div class="card">
       <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
         <h5 class="mb-0">
-          <i class="bi bi-robot me-2"></i>Text-to-SQL Query
+          <i class="bi bi-robot me-2"></i>AI Data Assistant
         </h5>
         <small class="text-white-50">Ask questions in plain English</small>
       </div>
@@ -155,7 +155,7 @@ async function submitQuery() {
       params.branch = branchStore.selectedBranch
     }
 
-    const response = await axios.post('/v1/chq/text-to-sql/', {
+    const response = await axios.post('/v1/chq/ai-data-assistant/', {
       question: question.value.trim(),
       api_key_profile: apiKeyProfile.value,
       max_rows: maxRows.value,
@@ -225,3 +225,5 @@ pre {
   overflow-y: auto;
 }
 </style>
+
+

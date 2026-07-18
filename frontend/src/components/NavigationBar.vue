@@ -151,7 +151,7 @@ const menuItems = ref([
     name: 'Tools',
     icon: 'bi-tools',
     submenu: [
-    { name: 'Text-to-SQL', link: '/tools/text-to-sql', icon: 'bi-robot' },
+    { name: 'AI Data Assistant', link: '/tools/ai-data-assistant', icon: 'bi-robot' },
     ]
   }
 ]);
@@ -253,3 +253,4 @@ const toggleUserDropdown = () => {
   }
 }
 </style>
+

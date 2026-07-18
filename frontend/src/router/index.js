@@ -118,9 +118,9 @@ const routes = [
       meta: { requiresAuth: true }
     },
     {
-      path: '/tools/text-to-sql',
-      name: 'TextToSql',
-      component: () => import('@/views/TextToSqlView.vue'),
+      path: '/tools/ai-data-assistant',
+      name: 'AIDataAssistant',
+      component: () => import('@/views/AIDataAssistantView.vue'),
       meta: { requiresAuth: true }
     }
 ];
@@ -141,4 +141,7 @@ router.beforeEach((to, from, next) => {
 });
 
 export default router;
+
+
+
 

@@ -10,23 +10,23 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from cheques.models import Branch
-from text_to_sql.models import TextToSqlLog
-from text_to_sql.serializers import TextToSqlRequestSerializer, TextToSqlResponseSerializer
-from text_to_sql.utils.prompt_builder import build_prompt
-from text_to_sql.utils.llm_client import LlmClient, LlmClientError
-from text_to_sql.utils.sql_validator import validate_sql, inject_tenant_filter, enforce_row_limit, strip_parameters
-from text_to_sql.utils.security import set_readonly_session
+from ai_data_assistant.models import AIDataAssistantLog
+from ai_data_assistant.serializers import AIDataAssistantRequestSerializer, AIDataAssistantResponseSerializer
+from ai_data_assistant.utils.prompt_builder import build_prompt
+from ai_data_assistant.utils.llm_client import LlmClient, LlmClientError
+from ai_data_assistant.utils.sql_validator import validate_sql, inject_tenant_filter, enforce_row_limit, strip_parameters
+from ai_data_assistant.utils.security import set_readonly_session
 
 logger = logging.getLogger(__name__)
 
 
-class TextToSqlView(APIView):
+class AIDataAssistantView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
         start_time = time.time()
 
-        serializer = TextToSqlRequestSerializer(data=request.data)
+        serializer = AIDataAssistantRequestSerializer(data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -45,7 +45,7 @@ class TextToSqlView(APIView):
             branch_id = branch_obj.id
             branch_alias_id = branch_obj.alias_id
 
-        log_entry = TextToSqlLog(
+        log_entry = AIDataAssistantLog(
             user=user,
             branch_id=branch_id,
             question=question,
@@ -72,7 +72,7 @@ class TextToSqlView(APIView):
                 log_entry.execution_time_ms = int((time.time() - start_time) * 1000)
                 log_entry.save()
                 return Response(
-                    TextToSqlResponseSerializer({
+                    AIDataAssistantResponseSerializer({
                         'question': question,
                         'generated_sql': generated_sql,
                         'success': False,
@@ -104,7 +104,7 @@ class TextToSqlView(APIView):
             log_entry.success = True
             log_entry.save()
 
-            return Response(TextToSqlResponseSerializer({
+            return Response(AIDataAssistantResponseSerializer({
                 'question': question,
                 'generated_sql': generated_sql,
                 'executed_sql': safe_sql,
@@ -127,7 +127,7 @@ class TextToSqlView(APIView):
             log_entry.execution_time_ms = execution_time
             log_entry.save()
             return Response(
-                TextToSqlResponseSerializer({
+                AIDataAssistantResponseSerializer({
                     'question': question,
                     'generated_sql': None,
                     'success': False,
@@ -142,9 +142,9 @@ class TextToSqlView(APIView):
             log_entry.error_message = str(e)
             log_entry.execution_time_ms = execution_time
             log_entry.save()
-            logger.exception("Text-to-SQL execution error")
+            logger.exception("AI Data Assistant execution error")
             return Response(
-                TextToSqlResponseSerializer({
+                AIDataAssistantResponseSerializer({
                     'question': question,
                     'generated_sql': generated_sql,
                     'success': False,
@@ -152,3 +152,5 @@ class TextToSqlView(APIView):
                 }).data,
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+

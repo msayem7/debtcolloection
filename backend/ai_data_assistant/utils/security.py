@@ -21,20 +21,20 @@ class TextToSqlSecurityMiddleware:
 
 class ReadOnlyDatabaseRouter:
     """
-    Database router that directs all queries from the text_to_sql app
+    Database router that directs all queries from the ai_data_assistant app
     to a read-only database connection if configured.
     Falls back to the default database with read-only session settings.
     """
 
-    route_app_labels = {'text_to_sql'}
+    route_app_labels = {'ai_data_assistant'}
 
     def db_for_read(self, model, **hints):
-        if model._meta.app_label == 'text_to_sql':
+        if model._meta.app_label == 'ai_data_assistant':
             return 'default'
         return None
 
     def db_for_write(self, model, **hints):
-        if model._meta.app_label == 'text_to_sql':
+        if model._meta.app_label == 'ai_data_assistant':
             return 'default'
         return None
 
@@ -42,7 +42,7 @@ class ReadOnlyDatabaseRouter:
         return None
 
     def allow_migrate(self, db, app_label, model_name=None, **hints):
-        if app_label == 'text_to_sql':
+        if app_label == 'ai_data_assistant':
             return db == 'default'
         return None
 

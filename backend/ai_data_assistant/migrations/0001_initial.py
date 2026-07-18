@@ -31,11 +31,11 @@ class Migration(migrations.Migration):
             options={
                 'verbose_name': 'API Key Profile',
                 'verbose_name_plural': 'API Key Profiles',
-                'db_table': 'text_to_sql_api_key_profile',
+                'db_table': 'ai_data_assistant_api_key_profile',
             },
         ),
         migrations.CreateModel(
-            name='TextToSqlLog',
+            name='AIDataAssistantLog',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('question', models.TextField()),
@@ -59,8 +59,10 @@ class Migration(migrations.Migration):
             options={
                 'verbose_name': 'Text-to-SQL Log',
                 'verbose_name_plural': 'Text-to-SQL Logs',
-                'db_table': 'text_to_sql_log',
-                'indexes': [models.Index(fields=['user', '-created_at'], name='text_to_sql_user_id_06c486_idx'), models.Index(fields=['branch', '-created_at'], name='text_to_sql_branch__cf1df2_idx'), models.Index(fields=['-created_at'], name='text_to_sql_created_e35026_idx')],
+                'db_table': 'ai_data_assistant_log',
+                'indexes': [models.Index(fields=['user', '-created_at'], name='ai_data_assistant_user_id_06c486_idx'), models.Index(fields=['branch', '-created_at'], name='ai_data_assistant_branch__cf1df2_idx'), models.Index(fields=['-created_at'], name='ai_data_assistant_created_e35026_idx')],
             },
         ),
     ]
+
+
