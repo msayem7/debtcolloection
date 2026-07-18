@@ -1053,7 +1053,8 @@ class CreditInvoiceReportView(APIView):
                 0
             ) AS days_overdue,
             p.alias_id payment_alias_id,
-            ci.payment_id as payment_SL
+            ci.payment_id as payment_SL,
+            ci.remarks
         FROM credit_invoice ci
         LEFT JOIN payment p ON p.id = ci.payment_id
         LEFT JOIN customer c ON c.id = ci.customer_id
@@ -1091,6 +1092,7 @@ class CreditInvoiceReportView(APIView):
                 (ci.sales_amount - ci.sales_return) AS net_sales,
                 p.received_date, ci.payment_id, p.shortage_amount,
                 p.alias_id payment_alias_id,
+                ci.remarks,
                 ROW_NUMBER() OVER (
                     PARTITION BY ci.payment_id
                     ORDER BY p.received_date ASC NULLS LAST, ci.payment_id, ci.transaction_date
@@ -1133,7 +1135,8 @@ class CreditInvoiceReportView(APIView):
             ) AS days_overdue,
             ci.payment_grace_days as grace_days,
             ci.payment_alias_id,
-            ci.serial_num as payment_SL
+            ci.serial_num as payment_SL,
+            ci.remarks
         FROM invoices_ranked ci
         LEFT JOIN payment_summary ps
             ON ps.payment_id = ci.payment_id AND ci.serial_num = 1
@@ -1218,23 +1221,39 @@ class CreditInvoiceReportView(APIView):
         # Date filter - Received date mode only valid for 'all' and 'paid'
         date_mode = params.get('date_mode', 'transaction_date')
         if status in ('due', 'immature_due', 'matured_due'):
-            date_mode = 'transaction_date'
+            if date_mode == 'received_date':
+                date_mode = 'transaction_date'
 
         date_from = params.get('date_from')
         date_to = params.get('date_to')
 
         if date_from and date_to:
-            col = 'p.received_date' if date_mode == 'received_date' else 'ci.transaction_date'
-            snippets['date_filter'] = f" AND {col} BETWEEN %(date_from)s::date AND %(date_to)s::date"
+            if date_mode == 'due_date':
+                snippets['date_filter'] = (
+                    " AND (ci.transaction_date + ci.payment_grace_days) "
+                    "BETWEEN %(date_from)s::date AND %(date_to)s::date"
+                )
+            elif date_mode == 'received_date':
+                snippets['date_filter'] = " AND p.received_date BETWEEN %(date_from)s::date AND %(date_to)s::date"
+            else:
+                snippets['date_filter'] = " AND ci.transaction_date BETWEEN %(date_from)s::date AND %(date_to)s::date"
             extra_params['date_from'] = date_from
             extra_params['date_to'] = date_to
         elif date_from:
-            col = 'p.received_date' if date_mode == 'received_date' else 'ci.transaction_date'
-            snippets['date_filter'] = f" AND {col} >= %(date_from)s::date"
+            if date_mode == 'due_date':
+                snippets['date_filter'] = " AND (ci.transaction_date + ci.payment_grace_days) >= %(date_from)s::date"
+            elif date_mode == 'received_date':
+                snippets['date_filter'] = " AND p.received_date >= %(date_from)s::date"
+            else:
+                snippets['date_filter'] = " AND ci.transaction_date >= %(date_from)s::date"
             extra_params['date_from'] = date_from
         elif date_to:
-            col = 'p.received_date' if date_mode == 'received_date' else 'ci.transaction_date'
-            snippets['date_filter'] = f" AND {col} <= %(date_to)s::date"
+            if date_mode == 'due_date':
+                snippets['date_filter'] = " AND (ci.transaction_date + ci.payment_grace_days) <= %(date_to)s::date"
+            elif date_mode == 'received_date':
+                snippets['date_filter'] = " AND p.received_date <= %(date_to)s::date"
+            else:
+                snippets['date_filter'] = " AND ci.transaction_date <= %(date_to)s::date"
             extra_params['date_to'] = date_to
 
         # Return only filter
@@ -1282,6 +1301,7 @@ class CreditInvoiceReportView(APIView):
                 'show_instrument_numbers', 'false'
             ).lower() == 'true',
             'return_only': request.query_params.get('return_only', 'false').lower() == 'true',
+            'show_remarks': request.query_params.get('show_remarks', 'false').lower() == 'true',
         }
 
     def _execute_query(self, sql_template, sql_params, filter_snippets):
@@ -1378,6 +1398,8 @@ class CreditInvoiceReportView(APIView):
                 'child_customer': params.get('child_customer'),
                 'show_instrument_numbers': params['show_instrument_numbers'],
                 'return_only': params['return_only'],
+                'show_remarks': params['show_remarks'],
+                'show_payment_info': params['status'] in ('all', 'paid'),
             }
         })
 
@@ -1390,6 +1412,9 @@ class CreditInvoiceReportView(APIView):
 
         data = self._get_data(params, use_query2=False)
         total_count, totals = self._get_count_and_totals(params)
+
+        show_payment_info = params['status'] in ('all', 'paid')
+        show_remarks = params['show_remarks']
 
         groups = {}                   
 
@@ -1416,20 +1441,33 @@ class CreditInvoiceReportView(APIView):
             filter_text += f" | Customer: {params['child_customer']}"
         if params['return_only']:
             filter_text += ' | Return Only: Yes'
+        if show_remarks:
+            filter_text += ' | Remarks: Yes'
         elements.append(Paragraph(filter_text, styles['Normal']))
         elements.append(Spacer(1, 4*mm))
 
-        header_cols = ['Received Date', 'Cheque/Cash Amt', 'Claim Amt', 'Shortage Amt']
+        if show_payment_info:
+            header_cols = ['Received Date', 'Cheque/Cash Amt', 'Claim Amt', 'Shortage Amt']
+        else:
+            header_cols = ['Received Date']
         detail_cols = ['SL No', 'Parent Org', 'Customer', 'Trans Date', 'Grace Days', 'Due Date', 'Sales Amt', 'Sales Return', 'Net Sales', 'Days Overdue']
+        if show_remarks:
+            detail_cols.append('Remarks')
 
         grand_sales = grand_return = grand_net = 0
 
         for pid, rows in groups.items():
             first = rows[0]
             if pid is None:
-                hdr_data = [['Unpaid', '', '', '']]
+                if show_payment_info:
+                    hdr_data = [['Unpaid', '', '', '']]
+                else:
+                    hdr_data = [['Unpaid']]
             else:
-                hdr_data = [[self.fmt_date(first.get('received_date') or ''), str(first.get('cheque_cash_amount') or '0'), str(first.get('claim_amount') or '0'), str(first.get('shortage_amount') or '0')]]
+                if show_payment_info:
+                    hdr_data = [[self.fmt_date(first.get('received_date') or ''), str(first.get('cheque_cash_amount') or '0'), str(first.get('claim_amount') or '0'), str(first.get('shortage_amount') or '0')]]
+                else:
+                    hdr_data = [[self.fmt_date(first.get('received_date') or '')]]
 
             ht = Table([header_cols] + hdr_data)
             ht.setStyle(TableStyle([
@@ -1443,7 +1481,19 @@ class CreditInvoiceReportView(APIView):
             elements.append(ht)
             elements.append(Spacer(1, 2*mm))
 
-            d_rows = [[r['sl_no'], r['parent_organization'] or '', r['customer_name'] or '', self.fmt_date(r['transaction_date']), str(r['grace_days']), self.fmt_date(r.get('due_date', r.get('Due_Date', '')) or ''), str(r['sales_amount']), str(r['sales_return']), str(r['net_sales']), str(r['days_overdue'])] for r in rows]
+            d_rows = []
+            for r in rows:
+                detail_row = [
+                    r['sl_no'], r['parent_organization'] or '', r['customer_name'] or '',
+                    self.fmt_date(r['transaction_date']), str(r['grace_days']),
+                    self.fmt_date(r.get('due_date', r.get('Due_Date', '')) or ''),
+                    str(r['sales_amount']), str(r['sales_return']), str(r['net_sales']),
+                    str(r['days_overdue']),
+                ]
+                if show_remarks:
+                    detail_row.append(r.get('remarks') or '')
+                d_rows.append(detail_row)
+
             dt = Table([detail_cols] + d_rows)
             dt.setStyle(TableStyle([
                 ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2c3e50')),
@@ -1509,13 +1559,56 @@ class CreditInvoiceReportView(APIView):
         number_alignment = Alignment(horizontal='right', vertical='center')
         text_alignment = Alignment(horizontal='left', vertical='center', wrap_text=True)
 
-        col_widths = {
-            1: 8, 2: 28, 3: 28, 4: 16, 5: 12, 6: 16, 7: 16,
-            8: 16, 9: 16, 10: 16, 11: 30, 12: 18, 13: 30, 14: 18,
-            15: 16, 16: 14, 17: 14,
-        }
+        show_payment_info = params['status'] in ('all', 'paid')
+        show_remarks = params['show_remarks']
+        show_instruments = params['show_instrument_numbers']
 
-        ws.merge_cells('A1:Q1')
+        # Determine column widths based on visible columns
+        col_widths = {
+            1: 8,   # SL No
+            2: 28,  # Parent Organization
+            3: 28,  # Customer Name
+            4: 16,  # Transaction Date
+            5: 12,  # Grace Days
+            6: 16,  # Due Date
+            7: 16,  # Received Date
+            8: 16,  # Sales Amount
+            9: 16,  # Sales Return
+            10: 16, # Net Sales
+        }
+        next_col = 11
+        if show_instruments:
+            col_widths[next_col] = 30     # Cheque Numbers
+            next_col += 1
+            col_widths[next_col] = 18     # Cheque/Cash Amount
+            next_col += 1
+            col_widths[next_col] = 30     # Claim Numbers
+            next_col += 1
+            col_widths[next_col] = 18     # Claim Amount
+            next_col += 1
+        else:
+            if show_payment_info:
+                col_widths[next_col] = 18     # Cheque/Cash Amount
+                next_col += 1
+                col_widths[next_col] = 18     # Claim Amount
+                next_col += 1
+        if show_payment_info:
+            col_widths[next_col] = 16     # Shortage Amount
+            next_col += 1
+        else:
+            next_col += 1 if not show_instruments else 0
+        col_widths[next_col] = 14         # Days Overdue
+        next_col += 1
+        col_widths[next_col] = 14         # Payment SL
+        next_col += 1
+        if show_remarks:
+            col_widths[next_col] = 30     # Remarks
+            next_col += 1
+
+        total_cols = max(col_widths.keys()) if col_widths else 1
+        last_col_letter = get_column_letter(total_cols)
+
+        ws.merge_cells(f'A1:{last_col_letter}1')
         title_cell = ws['A1']
         title_cell.value = 'Credit Invoice Report'
         title_cell.font = title_font
@@ -1551,6 +1644,7 @@ class CreditInvoiceReportView(APIView):
             ('Parent Customer', parent_customer_name),
             ('Child Customer', child_customer_name),
             ('Return Only', 'Yes' if params['return_only'] else 'No'),
+            ('Show Remarks', 'Yes' if show_remarks else 'No'),
         ]
         for i, (label, value) in enumerate(filter_info):
             row_num = 2 + i
@@ -1562,11 +1656,19 @@ class CreditInvoiceReportView(APIView):
 
         ws.append([])
 
-        show_instruments = params['show_instrument_numbers']
         if show_instruments:
             cols = ['SL No', 'Parent Organization', 'Customer Name', 'Transaction Date', 'Grace Days', 'Due Date', 'Received Date', 'Sales Amount', 'Sales Return', 'Net Sales', 'Cheque Numbers', 'Cheque/Cash Amount', 'Claim Numbers', 'Claim Amount', 'Shortage Amount', 'Days Overdue', 'Payment SL']
         else:
-            cols = ['SL No', 'Parent Organization', 'Customer Name', 'Transaction Date', 'Grace Days', 'Due Date', 'Received Date', 'Sales Amount', 'Sales Return', 'Net Sales', 'Cheque/Cash Amount', 'Claim Amount', 'Shortage Amount', 'Days Overdue', 'Payment SL']
+            cols = ['SL No', 'Parent Organization', 'Customer Name', 'Transaction Date', 'Grace Days', 'Due Date', 'Received Date', 'Sales Amount', 'Sales Return', 'Net Sales']
+
+        if not show_instruments and show_payment_info:
+            cols += ['Cheque/Cash Amount', 'Claim Amount']
+        if show_payment_info:
+            cols += ['Shortage Amount']
+        if not show_instruments:
+            cols += ['Days Overdue', 'Payment SL']
+        if show_remarks:
+            cols.append('Remarks')
 
         header_row = ws.max_row + 1
         for col_idx, col_name in enumerate(cols, 1):
@@ -1593,33 +1695,51 @@ class CreditInvoiceReportView(APIView):
                 (7, recv_date, date_alignment),
             ]
 
-            if show_instruments:
-                values = common_values + [
-                    (8, float(row.get("sales_amount", 0)), number_alignment),
-                    (9, float(row.get("sales_return", 0)), number_alignment),
-                    (10, float(row.get("net_sales", 0)), number_alignment),
-                    (11, row.get("cheque_numbers", ""), text_alignment),
-                    (12, float(row.get("cheque_cash_amount", 0) or 0), number_alignment),
-                    (13, row.get("claim_numbers", ""), text_alignment),
-                    (14, float(row.get("claim_amount", 0) or 0), number_alignment),
-                    (15, float(row.get("shortage_amount", 0) or 0), number_alignment),
-                    (16, int(row.get("days_overdue", 0)), number_alignment),
-                    (17, int(row.get('payment_sl', 0)), number_alignment),
-                ]
-            else:
-                values = common_values + [
-                    (8, float(row.get("sales_amount", 0)), number_alignment),
-                    (9, float(row.get("sales_return", 0)), number_alignment),
-                    (10, float(row.get("net_sales", 0)), number_alignment),
-                    (11, float(row.get("cheque_cash_amount", 0) or 0), number_alignment),
-                    (12, float(row.get("claim_amount", 0) or 0), number_alignment),
-                    (13, float(row.get("shortage_amount", 0) or 0), number_alignment),
-                    (14, int(row.get("days_overdue", 0)), number_alignment),
-                    (15, int(row.get('payment_sl', 0)), number_alignment),
-                ]
+            values = list(common_values)
+            col_idx = 8
 
-            for col_idx, val, align in values:
-                cell = ws.cell(row=data_row_num, column=col_idx, value=val)
+            # Sales Amount
+            values.append((col_idx, float(row.get("sales_amount", 0)), number_alignment))
+            col_idx += 1
+            # Sales Return
+            values.append((col_idx, float(row.get("sales_return", 0)), number_alignment))
+            col_idx += 1
+            # Net Sales
+            values.append((col_idx, float(row.get("net_sales", 0)), number_alignment))
+            col_idx += 1
+
+            if show_instruments:
+                values.append((col_idx, row.get("cheque_numbers", ""), text_alignment))
+                col_idx += 1
+                values.append((col_idx, float(row.get("cheque_cash_amount", 0) or 0), number_alignment))
+                col_idx += 1
+                values.append((col_idx, row.get("claim_numbers", ""), text_alignment))
+                col_idx += 1
+                values.append((col_idx, float(row.get("claim_amount", 0) or 0), number_alignment))
+                col_idx += 1
+            else:
+                if show_payment_info:
+                    values.append((col_idx, float(row.get("cheque_cash_amount", 0) or 0), number_alignment))
+                    col_idx += 1
+                    values.append((col_idx, float(row.get("claim_amount", 0) or 0), number_alignment))
+                    col_idx += 1
+
+            if show_payment_info:
+                values.append((col_idx, float(row.get("shortage_amount", 0) or 0), number_alignment))
+                col_idx += 1
+
+            if not show_instruments:
+                values.append((col_idx, int(row.get("days_overdue", 0)), number_alignment))
+                col_idx += 1
+                values.append((col_idx, int(row.get('payment_sl', 0)), number_alignment))
+                col_idx += 1
+
+            if show_remarks:
+                values.append((col_idx, row.get("remarks") or "", text_alignment))
+                col_idx += 1
+
+            for c_idx, val, align in values:
+                cell = ws.cell(row=data_row_num, column=c_idx, value=val)
                 cell.font = value_font
                 cell.alignment = align
                 cell.border = thin_border
@@ -1642,6 +1762,9 @@ class CreditInvoiceReportView(APIView):
         import csv
         data = self._get_data(params, use_query2=True)
 
+        show_payment_info = params['status'] in ('all', 'paid')
+        show_remarks = params['show_remarks']
+
         def csv_generator():
             yield '# Credit Invoice Report\n'
             yield f'# Report Date: {params["report_date"]}\n'
@@ -1652,12 +1775,24 @@ class CreditInvoiceReportView(APIView):
             yield f'# Parent Customer: {params.get("parent_customer", "All")}\n'
             yield f'# Child Customer: {params.get("child_customer", "All")}\n'
             yield f'# Return Only: {"Yes" if params["return_only"] else "No"}\n'
+            yield f'# Show Remarks: {"Yes" if show_remarks else "No"}\n'
             yield '\n'
 
+            cols = ['Invoice No', 'Parent Organization', 'Customer Name', 'Transaction Date', 'Grace Days', 'Due Date', 'Received Date', 'Sales Amount', 'Sales Return', 'Net Sales']
+
             if params['show_instrument_numbers']:
-                cols = ['Invoice No', 'Parent Organization', 'Customer Name', 'Transaction Date', 'Grace Days', 'Due Date', 'Received Date', 'Sales Amount', 'Sales Return', 'Net Sales', 'Cheque Numbers', 'Cheque/Cash Amount', 'Claim Numbers', 'Claim Amount', 'Shortage Amount', 'Payment SL', 'Days Overdue']
-            else:
-                cols = ['Invoice No', 'Parent Organization', 'Customer Name', 'Transaction Date', 'Grace Days', 'Due Date', 'Received Date', 'Sales Amount', 'Sales Return', 'Net Sales', 'Cheque/Cash Amount', 'Claim Amount', 'Shortage Amount', 'Payment SL', 'Days Overdue']
+                cols += ['Cheque Numbers', 'Cheque/Cash Amount', 'Claim Numbers', 'Claim Amount']
+            elif show_payment_info:
+                cols += ['Cheque/Cash Amount', 'Claim Amount']
+
+            if show_payment_info:
+                cols += ['Shortage Amount']
+
+            if not params['show_instrument_numbers']:
+                cols += ['Payment SL', 'Days Overdue']
+
+            if show_remarks:
+                cols.append('Remarks')
 
             buf = io.StringIO()
             writer = csv.writer(buf)
@@ -1667,10 +1802,45 @@ class CreditInvoiceReportView(APIView):
             buf.truncate(0)
 
             for row in data:
+                row_values = [
+                    row.get("sl_no") or "",
+                    row.get("parent_organization") or "",
+                    row.get("customer_name") or "",
+                    self.fmt_date(row.get("transaction_date")),
+                    row.get("grace_days") or 0,
+                    self.fmt_date(row.get("Due_Date") or row.get("due_date")),
+                    self.fmt_date(row.get("received_date")),
+                    row.get("sales_amount") or 0,
+                    row.get("sales_return") or 0,
+                    row.get("net_sales") or 0,
+                ]
+
                 if params['show_instrument_numbers']:
-                    writer.writerow([row.get("sl_no") or "", row.get("parent_organization") or "", row.get("customer_name") or "", self.fmt_date(row.get("transaction_date")), row.get("grace_days") or 0, self.fmt_date(row.get("Due_Date") or row.get("due_date")), self.fmt_date(row.get("received_date")), row.get("sales_amount") or 0, row.get("sales_return") or 0, row.get("net_sales") or 0, row.get("cheque_numbers") or "", row.get("cheque_cash_amount") or 0, row.get("claim_numbers") or "", row.get("claim_amount") or 0, row.get("shortage_amount") or 0, str(row.get('payment_sl') or ''), row.get("days_overdue") or 0])
-                else:
-                    writer.writerow([row.get("sl_no") or "", row.get("parent_organization") or "", row.get("customer_name") or "", self.fmt_date(row.get("transaction_date")), row.get("grace_days") or 0, self.fmt_date(row.get("Due_Date") or row.get("due_date")), self.fmt_date(row.get("received_date")), row.get("sales_amount") or 0, row.get("sales_return") or 0, row.get("net_sales") or 0, row.get("cheque_cash_amount") or 0, row.get("claim_amount") or 0, row.get("shortage_amount") or 0, str(row.get('payment_sl') or ''), row.get("days_overdue") or 0])
+                    row_values += [
+                        row.get("cheque_numbers") or "",
+                        row.get("cheque_cash_amount") or 0,
+                        row.get("claim_numbers") or "",
+                        row.get("claim_amount") or 0,
+                    ]
+                elif show_payment_info:
+                    row_values += [
+                        row.get("cheque_cash_amount") or 0,
+                        row.get("claim_amount") or 0,
+                    ]
+
+                if show_payment_info:
+                    row_values.append(row.get("shortage_amount") or 0)
+
+                if not params['show_instrument_numbers']:
+                    row_values += [
+                        str(row.get('payment_sl') or ''),
+                        row.get("days_overdue") or 0,
+                    ]
+
+                if show_remarks:
+                    row_values.append(row.get("remarks") or "")
+
+                writer.writerow(row_values)
                 yield buf.getvalue()
                 buf.seek(0)
                 buf.truncate(0)

@@ -35,6 +35,15 @@ X 06. Number of invoice in payment
         v. child customer
         vi. GRN number
     b. split the page from top to grid end. Payment Date, parent customer,  and summary section will be displayed at left pannel and filter and invoicess will be displayed at right pannel.buttons will be displayed at bottom.
+
+    Both Date and Parent Customer Length will be reduced to 50 % of current Size. Some filter conditions will be set at right side of this control to filter Invoices and all these filter will be displayed as group so that user can understood that this are filter condition not data payment data. 
+        1. Show selected data : a check box. It will show the selected invoices only if checked. By default uncheck and show all invoices of the selected parent customer. 
+        2. Tran. Date Range: 
+        3. Amount filter option: Sales, Return, Net Sales 
+        4. Amount Range: Based on amount filter selection Amount Range will be applicable. Amount Form means amount is Greater than or equal that “Amount From”. Amount to Means amount is Less than or equal “Amount To”  
+        4. Return Only: Display data that have return amount. 
+        5. Expand Data Area: this Selection will expand Invoice data area means expand height of both left-panel and right-panel
+
 ----------------------------------------------------------------------------------------
 
 

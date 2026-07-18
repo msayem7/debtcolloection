@@ -48,6 +48,10 @@
                 <input class="form-check-input" type="radio" v-model="filters.dateMode" value="transaction_date" id="modeTrans">
                 <label class="form-check-label" for="modeTrans">Trans. Date</label>
               </div>
+              <div class="form-check">
+                <input class="form-check-input" type="radio" v-model="filters.dateMode" value="due_date" id="modeDue">
+                <label class="form-check-label" for="modeDue">Due Date</label>
+              </div>
               <div class="form-check" :title="receivedDateDisabledTooltip">
                 <input class="form-check-input" type="radio" v-model="filters.dateMode" value="received_date" id="modeReceived" :disabled="isReceivedDateDisabled">
                 <label class="form-check-label" :class="{'text-muted': isReceivedDateDisabled}" for="modeReceived">
@@ -75,6 +79,10 @@
             <div class="form-check">
               <input class="form-check-input" type="checkbox" v-model="filters.showInstrumentNumbers" id="chkInstruments">
               <label class="form-check-label" for="chkInstruments">Show instruments numbers</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" v-model="filters.showRemarks" id="chkRemarks">
+              <label class="form-check-label" for="chkRemarks">Show Remarks</label>
             </div>
             <div class="form-check">
               <input class="form-check-input" type="checkbox" v-model="filters.returnOnly" id="chkReturn">
@@ -132,11 +140,12 @@
                 <th class="text-end">Sales Return</th>
                 <th class="text-end">Net Sales</th>
                 <th v-if="filters.showInstrumentNumbers">Cheque No</th>
-                <th class="text-end">Cheque/Cash</th>
+                <th v-if="showPaymentInfo" class="text-end">Cheque/Cash</th>
                 <th v-if="filters.showInstrumentNumbers">Claim No</th>
-                <th class="text-end">Claim Amt</th>
-                <th class="text-end">Shortage</th>
+                <th v-if="showPaymentInfo" class="text-end">Claim Amt</th>
+                <th v-if="showPaymentInfo" class="text-end">Shortage</th>
                 <th class="text-end">Days Overdue</th>
+                <th v-if="filters.showRemarks">Remarks</th>
               </tr>
             </thead>
             <tbody>
@@ -153,11 +162,12 @@
                 <td class="text-end">{{ formatNumber(row.sales_return) }}</td>
                 <td class="text-end">{{ formatNumber(row.net_sales) }}</td>
                 <td v-if="filters.showInstrumentNumbers">{{ row.cheque_numbers || '-' }}</td>
-                <td class="text-end">{{ formatNumber(row.cheque_cash_amount) }}</td>
+                <td v-if="showPaymentInfo" class="text-end">{{ formatNumber(row.cheque_cash_amount) }}</td>
                 <td v-if="filters.showInstrumentNumbers">{{ row.claim_numbers || '-' }}</td>
-                <td class="text-end">{{ formatNumber(row.claim_amount) }}</td>
-                <td class="text-end">{{ formatNumber(row.shortage_amount) }}</td>
+                <td v-if="showPaymentInfo" class="text-end">{{ formatNumber(row.claim_amount) }}</td>
+                <td v-if="showPaymentInfo" class="text-end">{{ formatNumber(row.shortage_amount) }}</td>
                 <td class="text-end">{{ row.days_overdue }}</td>
+                <td v-if="filters.showRemarks">{{ row.remarks || '-' }}</td>
               </tr>
             </tbody>
             <tfoot class="table-light fw-bold">
@@ -167,11 +177,12 @@
                 <td class="text-end">{{ formatNumber(totals.total_sales_return) }}</td>
                 <td class="text-end">{{ formatNumber(totals.total_net_sales) }}</td>
                 <td v-if="filters.showInstrumentNumbers"></td>
-                <td></td>
+                <td v-if="showPaymentInfo"></td>
                 <td v-if="filters.showInstrumentNumbers"></td>
+                <td v-if="showPaymentInfo"></td>
+                <td v-if="showPaymentInfo"></td>
                 <td></td>
-                <td></td>
-                <td></td>
+                <td v-if="filters.showRemarks"></td>
               </tr>
             </tfoot>
           </table>
@@ -343,6 +354,7 @@ const filters = reactive({
   dateFrom: '',
   dateTo: '',
   showInstrumentNumbers: false,
+  showRemarks: false,
   returnOnly: false,
   reportDate: today,
   interactiveEnabled: false,
@@ -373,14 +385,25 @@ const leftColumns = computed(() => {
   const cols = [...baseLeftColumns]
   if (filters.showInstrumentNumbers) {
     cols.push({ key: 'cheque_numbers', label: 'Cheque No', width: 150, sortable: true, align: 'left', resizable: true })
-    cols.push({ key: 'cheque_cash_amount', label: 'Cheque/Cash', width: 110, sortable: true, align: 'right', resizable: true })
+    if (showPaymentInfo.value) {
+      cols.push({ key: 'cheque_cash_amount', label: 'Cheque/Cash', width: 110, sortable: true, align: 'right', resizable: true })
+    }
     cols.push({ key: 'claim_numbers', label: 'Claim No', width: 150, sortable: true, align: 'left', resizable: true })
-    cols.push({ key: 'claim_amount', label: 'Claim Amt', width: 100, sortable: true, align: 'right', resizable: true })
+    if (showPaymentInfo.value) {
+      cols.push({ key: 'claim_amount', label: 'Claim Amt', width: 100, sortable: true, align: 'right', resizable: true })
+    }
   } else {
-    cols.push({ key: 'cheque_cash_amount', label: 'Cheque/Cash', width: 110, sortable: true, align: 'right', resizable: true })
-    cols.push({ key: 'claim_amount', label: 'Claim Amt', width: 100, sortable: true, align: 'right', resizable: true })
+    if (showPaymentInfo.value) {
+      cols.push({ key: 'cheque_cash_amount', label: 'Cheque/Cash', width: 110, sortable: true, align: 'right', resizable: true })
+      cols.push({ key: 'claim_amount', label: 'Claim Amt', width: 100, sortable: true, align: 'right', resizable: true })
+    }
   }
-  cols.push({ key: 'shortage_amount', label: 'Shortage', width: 100, sortable: true, align: 'right', resizable: true })
+  if (showPaymentInfo.value) {
+    cols.push({ key: 'shortage_amount', label: 'Shortage', width: 100, sortable: true, align: 'right', resizable: true })
+  }
+  if (filters.showRemarks) {
+    cols.push({ key: 'remarks', label: 'Remarks', width: 150, sortable: true, align: 'left', resizable: true })
+  }
   return cols
 })
 
@@ -409,6 +432,10 @@ const receivedDateDisabledTooltip = computed(() => {
 })
 const isInteractiveAvailable = computed(() => {
   return filters.status === 'paid'
+})
+
+const showPaymentInfo = computed(() => {
+  return filters.status === 'all' || filters.status === 'paid'
 })
 
 const uniquePayments = computed(() => {
@@ -537,6 +564,7 @@ const loadReport = async (page = 1) => {
       date_mode: filters.dateMode,
       report_date: filters.reportDate,
       show_instrument_numbers: filters.showInstrumentNumbers ? 'true' : 'false',
+      show_remarks: filters.showRemarks ? 'true' : 'false',
       return_only: filters.returnOnly ? 'true' : 'false',
       page: isInteractive ? 1 : currentPage.value,
       page_size: isInteractive ? 1000 : pageSize.value,
@@ -657,6 +685,7 @@ const exportPDF = async () => {
       date_mode: filters.dateMode,
       report_date: filters.reportDate,
       show_instrument_numbers: filters.showInstrumentNumbers ? 'true' : 'false',
+      show_remarks: filters.showRemarks ? 'true' : 'false',
       return_only: filters.returnOnly ? 'true' : 'false',
     }
     if (filters.parentCustomer) params.parent_customer = filters.parentCustomer
@@ -691,6 +720,7 @@ const exportExcel = async () => {
       date_mode: filters.dateMode,
       report_date: filters.reportDate,
       show_instrument_numbers: filters.showInstrumentNumbers ? 'true' : 'false',
+      show_remarks: filters.showRemarks ? 'true' : 'false',
       return_only: filters.returnOnly ? 'true' : 'false',
     }
     if (filters.parentCustomer) params.parent_customer = filters.parentCustomer
@@ -725,6 +755,7 @@ const exportCSV = async () => {
       date_mode: filters.dateMode,
       report_date: filters.reportDate,
       show_instrument_numbers: filters.showInstrumentNumbers ? 'true' : 'false',
+      show_remarks: filters.showRemarks ? 'true' : 'false',
       return_only: filters.returnOnly ? 'true' : 'false',
     }
     if (filters.parentCustomer) params.parent_customer = filters.parentCustomer
