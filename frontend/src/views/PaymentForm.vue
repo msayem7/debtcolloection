@@ -776,7 +776,8 @@ const handleSubmitError = (error) => {
   if (error.response?.status === 409) {
     // Version conflict error
     notificationStore.showError('This payment was modified by another user. Please refresh and try again.')
-  } else if (error.response?.data?.error?.details) {
+  }
+  else if (error.response?.data?.error?.details) {
     const newErrors = {}
     
     error.response.data.error.details.payment_details?.forEach((detailErrors, index) => {
@@ -789,7 +790,11 @@ const handleSubmitError = (error) => {
 
     errors.value = newErrors
     notificationStore.showError('Please correct the errors in the form')
-  } else {
+  }
+  else if (error.response?.data?.error) {
+    notificationStore.showError(error.response.data.error)
+  }
+  else {
     errors.value.general = [error.message || 'Failed to submit payment']
     notificationStore.showError(error.message || 'Failed to submit payment')
   }

@@ -466,7 +466,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
         validated_data = request.data.copy()
         payment_details_data = validated_data.pop('payment_details', [])
         invoices_data = validated_data.pop('invoices', [])
-        print('payment_details_data:', payment_details_data)
+        # print('payment_details_data:', payment_details_data)
 
         # Update payment fields
         for field, value in validated_data.items():
@@ -498,16 +498,17 @@ class PaymentViewSet(viewsets.ModelViewSet):
                 # Update existing detail
                 try:
                     detail = PaymentDetails.objects.get(alias_id=detail_alias_id)
-                    # instrument = PaymentInstrument.objects.get(id=detail_data['payment_instrument'])
-                    if not detail.payment_instrument.id == detail_data['payment_instrument'] or not detail.id_number == detail_data['id_number']:
-                        return Response({"error": "Numbers of existing instrument or Id Number can't be deleted or changed"}, status=status.HTTP_400_BAD_REQUEST)
+                    # 19-Jul-2026
+                    # Instrument delete or number change is not allowed. this process is harm full 
+                    # but as user want to replace auto generated instruument number with manual number (from log book) have to  allow it
+                    if not detail.payment_instrument.id == detail_data['payment_instrument']: #or not detail.id_number == detail_data['id_number']:
+                        #return Response({"error": "Numbers of existing instrument or Id number can't be deleted or changed"}, status=status.HTTP_400_BAD_REQUEST)
+                        return Response({"error": "Numbers of existing instrument or Id number can't be deleted"}, status=status.HTTP_400_BAD_REQUEST)
                         # No changes to instrument or ID number, just update other fields
                     # For existing details, don't change ID number
-                    for field, value in detail_data.items():
-                        # if field == 'payment_instrument':
-                        #     setattr(detail, field, instrument)
-                        # elif 
-                        if field != 'id_number' and field != 'payment_instrument' and field != 'alias_id' and hasattr(detail, field):
+                    for field, value in detail_data.items():                        
+                        #if field != 'id_number' and field != 'payment_instrument' and field != 'alias_id' and hasattr(detail, field):
+                        if field != 'payment_instrument' and field != 'alias_id' and hasattr(detail, field):
                             setattr(detail, field, value)
                     detail.save()
                     updated_detail_ids.append(detail.alias_id)
@@ -672,7 +673,7 @@ class ClaimViewSet(viewsets.ModelViewSet):
             F('payment_details__amount') - Coalesce(F('refund_amount'), 0),
             output_field=DecimalField()
         )
-    )  # Assuming serial_no 3 is for claims
+    ).order_by('payment_details__id_number')  # Assuming serial_no 3 is for claims
     # queryset =queryset.filter(instrument_type__serial_no=3)  # Assuming serial_no 3 is for claims
     serializer_class = ClaimListSerializer
     lookup_field = 'alias_id'
@@ -1884,7 +1885,7 @@ class ReceivedClaimReportView(APIView):
 
     CLAIM_QUERY = '''
         SELECT
-            ROW_NUMBER() OVER (ORDER BY p.received_date, cl.id) AS sl_no,
+            ROW_NUMBER() OVER (ORDER BY pd.id_number, cl.id) AS sl_no,
             cl.alias_id AS claim_id,
             p.received_date AS claim_date,
             c.name AS organization_name,
@@ -1901,13 +1902,14 @@ class ReceivedClaimReportView(APIView):
         JOIN customer c ON c.id = p.customer_id
         LEFT JOIN customer pc ON pc.id = c.parent_id AND pc.is_parent = TRUE
         JOIN payment_instrument pi ON pi.id = pd.payment_instrument_id
-        WHERE p.branch_id = %(branch_id)s
+WHERE p.branch_id = %(branch_id)s
+        AND pi.instrument_type_id = 3
         {parent_filter}
         {instrument_filter}
         {date_filter}
         {refund_filter}
         {comments_filter}
-        ORDER BY p.received_date, cl.id
+        ORDER BY pd.id_number, cl.id
     '''
 
     RECEIVE_COUNT_QUERY = '''
@@ -1933,6 +1935,7 @@ class ReceivedClaimReportView(APIView):
         LEFT JOIN customer pc ON pc.id = c.parent_id AND pc.is_parent = TRUE
         JOIN payment_instrument pi ON pi.id = pd.payment_instrument_id
         WHERE p.branch_id = %(branch_id)s
+        AND pi.instrument_type_id = 3
         {parent_filter}
         {instrument_filter}
         {date_filter}
@@ -1967,6 +1970,7 @@ class ReceivedClaimReportView(APIView):
         LEFT JOIN customer pc ON pc.id = c.parent_id AND pc.is_parent = TRUE
         JOIN payment_instrument pi ON pi.id = pd.payment_instrument_id
         WHERE p.branch_id = %(branch_id)s
+        AND pi.instrument_type_id = 3
         {parent_filter}
         {instrument_filter}
         {date_filter}

@@ -60,4 +60,3 @@ class AIDataAssistantLog(models.Model):
 
     def __str__(self):
         return f"[{'OK' if self.success else 'FAIL'}] {self.question[:60]}"
-

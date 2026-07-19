@@ -123,7 +123,7 @@
                 <th>Received Date</th>
                 <th>Organization Name</th>
                 <th>Instrument Name</th>
-                <th>Instrument Number</th>
+                <th>ID Number</th>
                 <th class="text-end">Amount</th>
                 <th>Remarks</th>
               </tr>
@@ -158,7 +158,7 @@
                 <th>Claim Date</th>
                 <th>Organization Name</th>
                 <th>Instrument Name</th>
-                <th>Instrument Number</th>
+                <th>ID Number</th>
                 <th class="text-end">Amount</th>
                 <th>Refund</th>
                 <th>Refund Date</th>

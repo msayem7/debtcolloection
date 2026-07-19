@@ -71,7 +71,7 @@
           </div>
           <div class="col-md-3">
             <label class="form-label">To Date</label>
-            <input type="date" v-model="filters.dateTo" class="form-control" :max="filters.reportDate">
+            <input type="date" v-model="filters.dateTo" class="form-control">
           </div>
 
           <!-- Checkboxes -->

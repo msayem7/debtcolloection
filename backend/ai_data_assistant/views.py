@@ -87,6 +87,8 @@ class AIDataAssistantView(APIView):
 
             if branch_id:
                 _, safe_sql = inject_tenant_filter(safe_sql, branch_id, branch_alias_id)
+            else:
+                raise ValueError("A branch/office must be selected. Query cannot be executed without tenant isolation.")
 
             log_entry.executed_sql = safe_sql
 
