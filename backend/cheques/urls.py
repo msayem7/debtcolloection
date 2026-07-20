@@ -2,7 +2,7 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import ( CustomerViewSet
                     , BranchViewSet, CreditInvoiceViewSet,
-                    ClaimViewSet)
+                    ClaimViewSet, SystemConfigViewSet)
                     #, MasterClaimViewSet
                     # , CustomerClaimViewSet
                     # , CustomerPaymentViewSet
@@ -20,6 +20,7 @@ router.register(r'payment-instruments', PaymentInstrumentsViewSet, basename='pay
 router.register(r'payments', PaymentViewSet, basename='payment')
 router.register(r'PaymentInstrumentType', PaymentInstrumentTypeViewSet, basename='PaymentInstrumentType')
 router.register(r'claims', ClaimViewSet, basename='claim')
+router.register(r'system-config', SystemConfigViewSet, basename='system-config')
 
 # 
 

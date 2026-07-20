@@ -65,5 +65,16 @@ def custom_exception_handler(exc, context):
 
 def get_user_message(exc):
     if hasattr(exc, 'get_full_details'):
-        return exc.get_full_details()
+        details = exc.get_full_details()
+        if isinstance(details, dict):
+            for field, errors in details.items():
+                if isinstance(errors, list) and errors:
+                    first = errors[0]
+                    if isinstance(first, dict):
+                        return first.get('message', str(first))
+                    return str(first)
+                if isinstance(errors, str):
+                    return errors
+            return str(details)
+        return str(details)
     return str(exc)

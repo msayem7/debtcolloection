@@ -50,8 +50,9 @@ instance.interceptors.response.use(
           break
         case 400:
           notificationStore.showError(
-            data.detail || 
-            Object.values(data).flat().join(', ') || 
+            data?.error?.message ||
+            data.detail ||
+            (typeof data === 'object' ? Object.values(data).flat().filter(v => typeof v === 'string').join(', ') : '') ||
             'Invalid request'
           )
           break

@@ -5,6 +5,39 @@ from django.contrib.auth.models import User
 from django.utils import timezone
 from PIL import Image
 
+
+class SystemConfig(models.Model):
+    key = models.CharField(max_length=100, unique=True, help_text="Configuration key (e.g. 'MAX_BRANCH_COUNT')")
+    value = models.TextField(help_text="Configuration value")
+    description = models.TextField(blank=True, null=True, help_text="Human-readable description of this config parameter")
+    updated_at = models.DateTimeField(auto_now=True)
+    updated_by = models.ForeignKey(User, on_delete=models.PROTECT, null=True, blank=True)
+
+    class Meta:
+        db_table = 'system_config'
+        verbose_name = 'System Configuration'
+        verbose_name_plural = 'System Configurations'
+
+    def __str__(self):
+        return f"{self.key} = {self.value}"
+
+    @classmethod
+    def get_value(cls, key, default=None):
+        try:
+            return cls.objects.get(key=key).value
+        except cls.DoesNotExist:
+            return default
+
+    @classmethod
+    def get_int(cls, key, default=0):
+        value = cls.get_value(key)
+        if value is None:
+            return default
+        try:
+            return int(value)
+        except (ValueError, TypeError):
+            return default
+
 class BranchType(models.IntegerChoices):
     HEAD_OFFICE = 1, 'Head Office'
     BRANCH = 2, 'Branch'

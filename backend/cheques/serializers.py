@@ -1,7 +1,7 @@
 from django.db import models, transaction
 from rest_framework import serializers
 from .models import (Branch, #ChequeStore, InvoiceChequeMap, 
-                     Customer, CreditInvoice,) #MasterClaim, CustomerClaim, CustomerPayment, InvoiceClaimMap)
+                     Customer, CreditInvoice, SystemConfig) #MasterClaim, CustomerClaim, CustomerPayment, InvoiceClaimMap)
 from .models import Payment, PaymentDetails, Customer, Branch, PaymentInstrument, PaymentInstrumentType, Claim
 
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
@@ -50,6 +50,17 @@ class BranchSerializer(serializers.ModelSerializer):
         extra_kwargs = {
             'url': {'lookup_field': 'alias_id'}
         }
+
+    def validate(self, attrs):
+        if self.instance is None:
+            max_branches = SystemConfig.get_int('MAX_BRANCH_COUNT', 0)
+            if max_branches > 0:
+                current_count = Branch.objects.count()
+                if current_count >= max_branches:
+                    raise serializers.ValidationError(
+                        "System has reached its maximum branch opening capacity. Please contact the administrator."
+                    )
+        return attrs
    
 #-----------------------------
 class CustomerSerializer(serializers.ModelSerializer):
@@ -452,3 +463,37 @@ class ClaimUpdateSerializer(serializers.ModelSerializer):
 #     net_sales = serializers.DecimalField(max_digits=18, decimal_places=4)
 #     received = serializers.DecimalField(max_digits=18, decimal_places=4)
 #     due = serializers.DecimalField(max_digits=18, decimal_places=4)
+
+
+class SystemConfigSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SystemConfig
+        fields = ['key', 'value', 'description', 'updated_at', 'updated_by']
+        read_only_fields = ['updated_at', 'updated_by']
+
+    def validate_key(self, value):
+        allowed_keys = ['MAX_BRANCH_COUNT']
+        if value not in allowed_keys:
+            raise serializers.ValidationError(
+                f"Invalid configuration key. Allowed keys: {', '.join(allowed_keys)}"
+            )
+        return value
+
+    def validate_value(self, value):
+        try:
+            int_val = int(value)
+            if int_val < 0:
+                raise serializers.ValidationError("Value must be a non-negative integer.")
+        except ValueError:
+            raise serializers.ValidationError("Value must be a valid integer.")
+        return value
+
+    def update(self, instance, validated_data):
+        if self.context.get('request'):
+            validated_data['updated_by'] = self.context['request'].user
+        return super().update(instance, validated_data)
+
+    def create(self, validated_data):
+        if self.context.get('request'):
+            validated_data['updated_by'] = self.context['request'].user
+        return super().create(validated_data)

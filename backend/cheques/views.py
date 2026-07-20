@@ -47,18 +47,20 @@ from openpyxl import Workbook
 
 # Local Application Imports
 from .models import (
-    Branch, Customer, CreditInvoice #, CustomerPayment, ChequeStore,
+    Branch, Customer, CreditInvoice, SystemConfig #, CustomerPayment, ChequeStore,
     #CustomerClaim, InvoiceChequeMap, InvoiceClaimMap, MasterClaim
 )
 from .models import PaymentInstrument, Payment, PaymentDetails, PaymentInstrumentType, Claim
 
 from cheques import serializers
 from .serializers import ( # You'll need to create these serializers
-    ClaimListSerializer, ClaimUpdateSerializer
+    ClaimListSerializer, ClaimUpdateSerializer, SystemConfigSerializer
     #CustomerPaymentSerializer,  #ChequeStoreSerializer, CustomerClaimSerializer,
     # InvoiceChequeMapSerializer, MasterClaimSerializer
 )
 from .serializers import PaymentInstrumentSerializer, PaymentSerializer, PaymentDetailsSerializer
+
+from .permissions import IsSuperAdmin
 
 
 logger = logging.getLogger(__name__)
@@ -111,6 +113,17 @@ class BranchViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(updated_by=self.request.user)
+
+class SystemConfigViewSet(viewsets.ModelViewSet):
+    queryset = SystemConfig.objects.all()
+    serializer_class = SystemConfigSerializer
+    permission_classes = [IsAuthenticated, IsSuperAdmin]
+    lookup_field = 'key'
+
+    def get_queryset(self):
+        if not self.request.user.is_superuser:
+            return SystemConfig.objects.none()
+        return super().get_queryset()
 
 class CustomerViewSet(viewsets.ModelViewSet):
     queryset = Customer.objects.all()
