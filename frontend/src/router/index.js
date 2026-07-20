@@ -122,6 +122,24 @@ const routes = [
       name: 'AIDataAssistant',
       component: () => import('@/views/AIDataAssistantView.vue'),
       meta: { requiresAuth: true }
+    },
+    {
+      path: '/payment-instruments',
+      name: 'PaymentInstrumentList',
+      component: () => import('@/views/PaymentInstrumentList.vue'),
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/payment-instruments/create',
+      name: 'PaymentInstrumentCreate',
+      component: () => import('@/views/PaymentInstrumentForm.vue'),
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/payment-instruments/edit/:id',
+      name: 'PaymentInstrumentEdit',
+      component: () => import('@/views/PaymentInstrumentForm.vue'),
+      meta: { requiresAuth: true }
     }
 ];
 

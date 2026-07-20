@@ -300,28 +300,68 @@ class PaymentInstrumentTypeViewSet(viewsets.ReadOnlyModelViewSet):
     
     
 class PaymentInstrumentsViewSet(viewsets.ModelViewSet):
-    queryset = PaymentInstrument.objects.all()
+    queryset = PaymentInstrument.objects.select_related(
+        'branch', 'instrument_type', 'updated_by'
+    ).all()
     serializer_class = PaymentInstrumentSerializer
-    # Remove filterset_fields since we'll handle filtering manually
-    # filterset_fields= ['branch', 'is_active']
-    
+    permission_classes = [IsAuthenticated]
+
     def get_queryset(self):
         queryset = super().get_queryset()
         branch_id = self.request.query_params.get('branch')
         instrument_type_serial_no = self.request.query_params.get('instrument_type_serial_no')
-        is_active = self.request.query_params.get('is_active', 'true').lower() == 'true'
-        
-        
-        queryset = queryset.filter(is_active=is_active)
+        is_active_param = self.request.query_params.get('is_active')
+        instrument_type_id = self.request.query_params.get('instrument_type')
+
+        if is_active_param is not None:
+            if is_active_param.lower() == 'all':
+                pass
+            else:
+                is_active = is_active_param.lower() == 'true'
+                queryset = queryset.filter(is_active=is_active)
+        else:
+            queryset = queryset.filter(is_active=True)
 
         if branch_id:
-            # Use alias_id directly in the filter
             queryset = queryset.filter(branch__alias_id=branch_id)
 
         if instrument_type_serial_no:
             queryset = queryset.filter(instrument_type__serial_no=instrument_type_serial_no)
 
+        if instrument_type_id:
+            queryset = queryset.filter(instrument_type__id=instrument_type_id)
+
         return queryset.order_by('serial_no')
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context['request'] = self.request
+        return context
+
+    @transaction.atomic
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    @transaction.atomic
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+
+        client_version = request.data.get('version')
+        if client_version and int(client_version) != instance.version:
+            return Response(
+                {'error': f'This instrument has been modified by another user. Please refresh. Current version: {instance.version}'},
+                status=status.HTTP_409_CONFLICT
+            )
+
+        partial = kwargs.pop('partial', False)
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        serializer.save(updated_by=request.user, version=instance.version + 1)
+
+        return Response(serializer.data)
     
 
 class PaymentViewSet(viewsets.ModelViewSet):

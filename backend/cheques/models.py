@@ -148,6 +148,16 @@ class PaymentInstrument(models.Model):
         db_table = 'payment_instrument'
         verbose_name = 'Payment Instrument'
         verbose_name_plural = 'Payment Instruments'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['branch', 'serial_no'],
+                name='unique_branch_serial_no'
+            ),
+            models.UniqueConstraint(
+                fields=['branch', 'instrument_name'],
+                name='unique_branch_instrument_name'
+            ),
+        ]
 
     def __str__(self):
         return str(self.instrument_name)

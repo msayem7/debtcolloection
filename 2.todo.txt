@@ -62,4 +62,7 @@ Done 13. add note in invoice entry page
      b. Is this claim replace any axisting or ajusted with existing claim.
      c. Is Calim refund with generating another claim. 
 -------------------------------------------------------------------------
-15. 
+15. Instrument Entry UI
+16. Style and CSS is not working in production server for django admin interfaces.
+17 . 08 no point solve it
+18. Restriction on branch Creation. Only one branch can be created for a company. and currently no more company will be added.

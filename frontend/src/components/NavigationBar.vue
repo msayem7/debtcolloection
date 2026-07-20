@@ -117,6 +117,7 @@ const menuItems = ref([
     icon: 'bi-currency-dollar',
     submenu: [ 
       {name: 'Offices', link: '/branches',  icon: 'bi-house-door'},
+      {name: 'Payment Instruments', link: '/payment-instruments', icon: 'bi-wallet2'},
       // { name: 'Claims', link: '/claims', icon: 'bi bi-card-list'},
       // { name: 'Deductions', link: '/deductions', icon: 'bi bi-receipt-cutoff' },
      

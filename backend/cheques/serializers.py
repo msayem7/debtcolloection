@@ -149,11 +149,74 @@ class PaymentInstrumentTypeSerializer(serializers.ModelSerializer):
         read_only_fields = ['id']
 
 class PaymentInstrumentSerializer(serializers.ModelSerializer):
-    
+    branch = serializers.SlugRelatedField(
+        slug_field='alias_id',
+        queryset=Branch.objects.all(),
+        required=True
+    )
+    instrument_type = serializers.PrimaryKeyRelatedField(
+        queryset=PaymentInstrumentType.objects.all(),
+        required=True
+    )
+    instrument_type_name = serializers.CharField(
+        source='instrument_type.type_name',
+        read_only=True
+    )
+    is_cash_equivalent = serializers.BooleanField(
+        source='instrument_type.is_cash_equivalent',
+        read_only=True
+    )
+    type_serial_no = serializers.IntegerField(
+        source='instrument_type.serial_no',
+        read_only=True
+    )
+
     class Meta:
         model = PaymentInstrument
-        fields = ['id', 'branch', 'serial_no','instrument_type','instrument_name', 'is_active','version']
-        read_only_fields = ['version']
+        fields = [
+            'id', 'branch', 'serial_no', 'instrument_type', 'instrument_type_name',
+            'is_cash_equivalent', 'type_serial_no', 'instrument_name',
+            'is_active', 'updated_at', 'version'
+        ]
+        read_only_fields = ['id', 'serial_no', 'version', 'updated_at']
+
+    def validate(self, attrs):
+        request = self.context.get('request')
+        branch = attrs.get('branch') or getattr(self.instance, 'branch', None)
+
+        if not branch:
+            raise serializers.ValidationError({"branch": "Branch is required."})
+
+        instrument_name = attrs.get('instrument_name')
+        if instrument_name:
+            # Check branch-wise unique name (exclude current instance on update)
+            qs = PaymentInstrument.objects.filter(branch=branch, instrument_name=instrument_name)
+            if self.instance:
+                qs = qs.exclude(pk=self.instance.pk)
+            if qs.exists():
+                raise serializers.ValidationError(
+                    {"instrument_name": f"An instrument named '{instrument_name}' already exists in this branch."}
+                )
+
+        return attrs
+
+    def create(self, validated_data):
+        branch = validated_data['branch']
+        with transaction.atomic():
+            max_serial = PaymentInstrument.objects.select_for_update().filter(
+                branch=branch
+            ).aggregate(m=models.Max('serial_no'))['m'] or 0
+            validated_data['serial_no'] = max_serial + 1
+
+            if self.context.get('request'):
+                validated_data['updated_by'] = self.context['request'].user
+
+            return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        if self.context.get('request'):
+            validated_data['updated_by'] = self.context['request'].user
+        return super().update(instance, validated_data)
 
 class PaymentDetailsSerializer(serializers.ModelSerializer):
     payment_instrument = serializers.PrimaryKeyRelatedField(
